@@ -1,0 +1,627 @@
+{
+  "sessionId": "demo-medical",
+  "title": "小样本医学图像分割泛化性改进研究",
+  "description": "面向跨中心分布偏移的小样本医学图像分割研究推演，覆盖问题拆解、研究线索、方法评审与九章节研究报告。",
+  "topic": "小样本医学图像分割任务中的模型泛化性改进研究",
+  "mode": "demo",
+  "status": "completed",
+  "createdAt": "2026-11-17T09:00:00.000Z",
+  "agents": [
+    {
+      "id": "planner",
+      "name": "Planner",
+      "role": "研究规划师 · Research Planning",
+      "description": "把临床泛化问题拆解为可验证的研究子问题，并生成面向文献发现的英文检索词。",
+      "status": "completed",
+      "input": {
+        "topic": "小样本医学图像分割任务中的模型泛化性改进研究",
+        "objective": "把跨中心小样本分割的泛化性改进拆解为三个可验证、可实验的研究子问题，并给出两组英文检索词。",
+        "context": [
+          "临床数据来自不同设备与成像协议，单中心标注预算有限",
+          "目标是在不增加推理成本的前提下提升目标域 Dice 与边界质量"
+        ],
+        "constraints": [
+          "每个子问题必须对应可执行的实验设计与评价指标",
+          "检索词必须为英文并直接服务于文献发现"
+        ]
+      },
+      "output": {
+        "type": "planner",
+        "summary": "将课题拆解为偏移机理、方法权衡与伪标签条件三个研究问题，并生成两组英文检索词。",
+        "researchQuestions": [
+          {
+            "id": "q1",
+            "question": "跨中心分布偏移下，小样本分割模型的泛化性能主要由哪些因素主导？",
+            "rationale": "设备厂商、成像协议与标注规范共同构成复合偏移，现有单中心留出设置无法区分各因素的影响。",
+            "methodology": "构造 leave-one-center-out 基准，按设备、协议与标注密度分层，使用方差分解估计各因素对 Dice 下降的贡献。",
+            "expectedOutcome": "得到一份因素贡献排序，并明确最差中心场景下的性能下界与失效条件。"
+          },
+          {
+            "id": "q2",
+            "question": "情景式元学习与参数高效微调在精度—标注成本权衡上各自适用于什么条件？",
+            "rationale": "两类方法都声称低标注下有效，但训练目标与适配阶段不同，缺少在同一预算曲线上的对照。",
+            "methodology": "在 1-shot、5-shot 与全监督三种预算下比较 episodic 训练与仅更新归一化层的微调，并固定骨干与数据划分。",
+            "expectedOutcome": "给出按标注预算与目标域差异划分的方法选择准则，并量化各自的适用边界。"
+          },
+          {
+            "id": "q3",
+            "question": "不确定性感知的伪标签能否在无额外无标注数据的条件下稳定提升目标域 Dice？",
+            "rationale": "伪标签可能放大确认偏差，尤其在低质量扫描与类别不平衡条件下，需要以置信度门槛控制风险。",
+            "methodology": "使用预测熵与 MC Dropout 方差不一致性筛选伪标签，在目标域训练集上执行两轮自训练，并系统扫描置信度阈值。",
+            "expectedOutcome": "确定伪标签带来稳定收益的置信度区间，并给出收益消失或转为负向的边界条件。"
+          }
+        ],
+        "searchKeywords": [
+          {
+            "id": "kw1",
+            "label": "Core Problem",
+            "keywords": [
+              "few-shot medical image segmentation",
+              "cross-center domain shift",
+              "leave-one-center-out evaluation",
+              "annotation budget"
+            ],
+            "purpose": "定位跨中心小样本分割的核心问题与可复现的评测协议。"
+          },
+          {
+            "id": "kw2",
+            "label": "Method & Evaluation",
+            "keywords": [
+              "episodic meta-learning",
+              "parameter-efficient fine-tuning",
+              "test-time adaptation",
+              "uncertainty-aware pseudo-labeling",
+              "Dice and HD95"
+            ],
+            "purpose": "检索方法类工作与医学分割常用评价指标，支撑方法权衡分析。"
+          }
+        ]
+      },
+      "startedAt": "2026-11-17T09:00:05.000Z",
+      "completedAt": "2026-11-17T09:00:07.000Z",
+      "durationMs": 2000,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "role": "文献研究员 · Literature Discovery",
+      "description": "围绕研究问题检索并整理可追溯的研究线索，明确区分真实论文与模拟线索。",
+      "status": "completed",
+      "input": {
+        "topic": "小样本医学图像分割任务中的模型泛化性改进研究",
+        "objective": "围绕 Planner 的三个问题整理至少五条可追溯研究线索，并标注来源类型与关联问题。",
+        "context": [
+          "Planner 输出 3 个研究问题与 2 组英文检索词",
+          "每条线索必须关联具体研究问题 id，模拟线索不得附带 DOI 或链接"
+        ],
+        "constraints": [
+          "不得虚构真实论文的标题、作者、DOI 与链接",
+          "未经核实的线索一律标记为 simulated"
+        ]
+      },
+      "output": {
+        "type": "researcher",
+        "summary": "整理 5 条线索（1 条真实、4 条模拟），覆盖 U-Net 基线、复合偏移、episodic 训练、测试时适应与置信度伪标签。",
+        "literature": [
+          {
+            "id": "lit-unet-2015",
+            "title": "U-Net: Convolutional Networks for Biomedical Image Segmentation",
+            "authors": [
+              "Olaf Ronneberger",
+              "Philipp Fischer",
+              "Thomas Brox"
+            ],
+            "year": 2015,
+            "venue": "MICCAI 2015",
+            "abstract": "提出对称编码器—解码器结构与跳跃连接，并结合强数据增强，在有限标注的医学图像上取得高精度分割，成为后续小样本分割工作的常用骨干与可复核基线。",
+            "relevance": "high",
+            "sourceType": "real",
+            "doi": "10.1007/978-3-319-24574-4_28",
+            "url": "https://doi.org/10.1007/978-3-319-24574-4_28",
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "lit-center-shift",
+            "title": "Cross-Center Distribution Shift in Few-Shot Medical Segmentation: A Simulated Benchmark",
+            "authors": [
+              "Simulated Author A",
+              "Simulated Author B"
+            ],
+            "year": 2025,
+            "venue": "Simulated Benchmark Report (Demo Only)",
+            "abstract": "模拟基准报告称，设备与协议变化导致的 Dice 下降并不均匀，最差中心往往由标注规范差异驱动；该线索为演示数据，未经过同行评审。",
+            "relevance": "high",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q1"
+            ]
+          },
+          {
+            "id": "lit-episodic-budget",
+            "title": "Episodic Sampling under Limited Annotation Budgets for Organ Segmentation",
+            "authors": [
+              "Simulated Author C",
+              "Simulated Author D"
+            ],
+            "year": 2024,
+            "venue": "Simulated Workshop on Medical Vision (Demo Only)",
+            "abstract": "模拟研究显示，episodic 训练对任务采样与类别平衡较为敏感，在 5-shot 以下预算中收益明显，但跨协议迁移时可能低于轻量微调。",
+            "relevance": "high",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "lit-tta-device",
+            "title": "Lightweight Test-Time Adaptation for Cross-Device Dense Prediction",
+            "authors": [
+              "Simulated Author E",
+              "Simulated Author F"
+            ],
+            "year": 2025,
+            "venue": "Simulated Transactions on Medical Imaging (Demo Only)",
+            "abstract": "模拟结果表明，仅更新归一化层与少量偏置即可缓解同协议内的域偏移，但跨设备时更新幅度过大会导致过拟合，需要显式约束。",
+            "relevance": "medium",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q1",
+              "q2"
+            ]
+          },
+          {
+            "id": "lit-confidence-pseudo",
+            "title": "Confidence-Gated Pseudo-Labeling without External Unlabeled Data",
+            "authors": [
+              "Simulated Author G"
+            ],
+            "year": 2023,
+            "venue": "Simulated Conference on Low-Data Learning (Demo Only)",
+            "abstract": "模拟实验使用预测熵作为置信度门槛，在无外部无标注数据的设定下取得有限但稳定的提升；阈值过低时确认偏差显著放大。",
+            "relevance": "medium",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q3"
+            ]
+          }
+        ]
+      },
+      "startedAt": "2026-11-17T09:00:08.000Z",
+      "completedAt": "2026-11-17T09:00:11.000Z",
+      "durationMs": 3000,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "role": "学术审稿人 · Critical Review",
+      "description": "审查实验设置、基线公平性与统计计划，给出可执行的整改建议。",
+      "status": "completed",
+      "input": {
+        "topic": "小样本医学图像分割任务中的模型泛化性改进研究",
+        "objective": "对研究方案、文献线索与实验设计进行严格审查，输出恰好三条高价值意见。",
+        "context": [
+          "研究计划包含 3 个问题与两阶段适配方案",
+          "重点检查跨中心评估、标注预算对齐与统计功效"
+        ],
+        "constraints": [
+          "每条意见必须包含问题、影响与可执行建议",
+          "审查意见必须关联受影响的研究问题"
+        ]
+      },
+      "output": {
+        "type": "reviewer",
+        "summary": "识别出三项关键缺陷：复合域偏移覆盖不足、标注预算基线不对齐、统计功效与不确定性报告不完整。",
+        "review": [
+          {
+            "id": "rev-med-1",
+            "title": "跨中心实验设置无法覆盖复合域偏移",
+            "severity": "high",
+            "category": "dataset",
+            "problem": "当前只规划单一留出中心，设备厂商、成像协议与标注规范的影响被混在一起，无法回答 q1 中哪类偏移主导性能衰减。",
+            "impact": "若因素不可分离，后续方法收益难以归因，结论可能只在特定中心成立，无法支持临床部署判断。",
+            "recommendation": "至少纳入三个中心，按设备与协议分层执行 leave-one-center-out，并单独报告最差中心与复合偏移组合的结果。",
+            "relatedQuestionIds": [
+              "q1"
+            ]
+          },
+          {
+            "id": "rev-med-2",
+            "title": "缺少与标注预算对齐的全监督基线",
+            "severity": "high",
+            "category": "evaluation",
+            "problem": "仅与全监督 U-Net 的最终成绩比较，会把标注量差异误判为方法收益，无法检验 q2 提出的精度—成本权衡。",
+            "impact": "方法效果可能被系统性高估，且在 5-shot 条件下是否值得引入 episodic 训练缺乏可解释依据。",
+            "recommendation": "在相同标注预算下增加全监督基线，绘制 1-shot、5-shot 与全监督的预算—Dice 曲线，并报告交叉点。",
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "rev-med-3",
+            "title": "统计功效与不确定性报告不足",
+            "severity": "medium",
+            "category": "statistics",
+            "problem": "小样本实验对随机划分敏感，方案只报告单次结果，未说明种子数、置信区间与显著性检验，尤其影响伪标签阈值扫描的结论。",
+            "impact": "偶然波动可能被误读为方法收益，使 q3 的伪标签结论缺乏稳定性证据。",
+            "recommendation": "使用至少五个随机种子，报告均值、标准差与 95% 置信区间，并补充配对检验与阈值敏感性分析。",
+            "relatedQuestionIds": [
+              "q2",
+              "q3"
+            ]
+          }
+        ]
+      },
+      "startedAt": "2026-11-17T09:00:12.000Z",
+      "completedAt": "2026-11-17T09:00:14.000Z",
+      "durationMs": 2000,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "synthesizer",
+      "name": "Synthesizer",
+      "role": "报告综合师 · Research Synthesis",
+      "description": "整合规划、文献与评审产物，生成区分证据、假设与方案的结构化研究报告。",
+      "status": "completed",
+      "input": {
+        "topic": "小样本医学图像分割任务中的模型泛化性改进研究",
+        "objective": "整合前三阶段产物，撰写包含九个章节、区分 Evidence、Hypothesis 与 Proposal 的研究报告。",
+        "context": [
+          "Planner、Researcher、Reviewer 的完整输出与整改建议",
+          "医学分割指标要求 Dice、IoU 与 HD95 并给出标准 LaTeX 公式"
+        ],
+        "constraints": [
+          "报告使用 Markdown 与标准 LaTeX，不得把模拟线索表述为已验证事实",
+          "实验设计必须回应审稿意见并保持可复现"
+        ]
+      },
+      "output": {
+        "type": "synthesizer",
+        "summary": "生成九章节研究报告，区分已有证据、待验证假设与分阶段研究方案，并给出 Dice、IoU、HD95 评价协议。",
+        "finalReport": "## 1. 研究背景\n\n小样本医学图像分割要求在仅有少量标注样本的前提下，把模型迁移到新的机构、设备与成像协议。U-Net 及其数据增强策略证明了有限标注条件下分割的可行性，但跨中心部署时，强度分布、解剖形态与标注规范差异会共同造成性能衰减。**Evidence**：真实文献表明强增强与跳跃连接能稳定训练，但并未回答域偏移的来源与可控因素。\n\n本研究把问题限定为标注预算受限时的跨域泛化改进，优先保证实验设置可复现，而不是追求单次榜单提升。\n\n## 2. 核心研究问题\n\n1. 跨中心分布偏移下，小样本分割模型的泛化性能主要由哪些因素主导？\n2. 情景式元学习与参数高效微调在精度—标注成本权衡上各自适用于什么条件？\n3. 不确定性感知的伪标签能否在无额外无标注数据的条件下稳定提升目标域 Dice？\n\n## 3. 相关研究与证据\n\n**Evidence**：U-Net（MICCAI 2015）提供了可复核的编码器—解码器基线。四条模拟线索给出待核验的观察：复合偏移下最差中心可能由标注规范驱动；episodic 采样对任务分布与标注预算敏感；仅更新归一化层的测试时适应在跨设备时存在过拟合风险；伪标签收益依赖置信度门槛与类别平衡。模拟线索仅用于演示，不能作为既有结论引用。\n\n## 4. 研究假设\n\n**Hypothesis**：在设备与协议分层后，标注规范差异将是跨中心 Dice 下降的主导因素；当标注预算低于 5-shot 时，域感知 episodic 训练的收益高于轻量测试时适应；当置信度门槛高于 0.8 时，伪标签可带来稳定但有限的提升。\n\n## 5. 技术路线\n\n**Proposal**：阶段一构造设备、协议与机构分层的 episode 采样，训练共享骨干；阶段二在目标域仅更新归一化层与注意力偏置，并限制更新幅度；阶段三在目标域训练集上使用熵与 MC Dropout 不一致性筛选伪标签，执行两轮自训练。三个阶段共用同一骨干、数据划分与预算曲线，避免引入额外的推理成本。\n\n## 6. 实验设计\n\n| 设置 | 源域 | 目标域 | 目的 |\n| --- | --- | --- | --- |\n| A | 中心 1–2 | 中心 3 | 同协议跨中心泛化 |\n| B | 中心 1–3 | 中心 4（新设备） | 跨设备鲁棒性 |\n| C | 全部源域 | 低质量扫描子集 | 退化条件下的稳定性 |\n\n每个设置执行 leave-one-center-out，预算曲线包含 1-shot、5-shot 与全监督，并固定骨干、优化器与数据划分。所有结果报告至少五个随机种子的均值与 95% 置信区间。\n\n## 7. 评价指标\n\n主要指标使用 Dice 与 IoU，边界质量使用 HD95，同时记录推理时延与可训练参数比例：\n\n$$\\mathrm{Dice}(P,G)=\\frac{2\\,|P\\cap G|}{|P|+|G|},\\qquad \\mathrm{IoU}(P,G)=\\frac{|P\\cap G|}{|P\\cup G|}$$\n\n$$\\mathrm{HD95}(P,G)=P_{95}\\big(\\{\\,d(p,\\partial G)\\mid p\\in\\partial P\\,\\}\\cup\\{\\,d(g,\\partial P)\\mid g\\in\\partial G\\,\\}\\big)$$\n\n## 8. 潜在风险\n\n- 复合域偏移覆盖不足：单中心留出会混淆设备、协议与标注规范的影响。\n- 基线不公平：未按标注预算对齐的全监督基线会高估方法收益。\n- 统计功效有限：种子数过少会放大偶然波动，尤其是伪标签阈值扫描。\n- 模拟线索未经验证：所有模拟研究只能作为待检验假设，不能进入结论。\n\n## 9. 下一步研究建议\n\n1. 先完成三中心试点与设备分层，确认偏移主导因素。\n2. 在同一预算曲线上补齐标注预算对齐的全监督基线。\n3. 对伪标签阈值执行小规模功效分析，确定种子数与置信区间报告方式。\n4. 将真实文献核验流程纳入正式研究，替换全部模拟线索。\n\n> DEMO DATA：本报告由本地模拟数据与可复核的 U-Net 基线组合生成，仅用于产品演示，不构成科研结论。"
+      },
+      "startedAt": "2026-11-17T09:00:15.000Z",
+      "completedAt": "2026-11-17T09:00:18.000Z",
+      "durationMs": 3000,
+      "error": null,
+      "fallbackReason": null
+    }
+  ],
+  "researchPlan": {
+    "researchQuestions": [
+      {
+        "id": "q1",
+        "question": "跨中心分布偏移下，小样本分割模型的泛化性能主要由哪些因素主导？",
+        "rationale": "设备厂商、成像协议与标注规范共同构成复合偏移，现有单中心留出设置无法区分各因素的影响。",
+        "methodology": "构造 leave-one-center-out 基准，按设备、协议与标注密度分层，使用方差分解估计各因素对 Dice 下降的贡献。",
+        "expectedOutcome": "得到一份因素贡献排序，并明确最差中心场景下的性能下界与失效条件。"
+      },
+      {
+        "id": "q2",
+        "question": "情景式元学习与参数高效微调在精度—标注成本权衡上各自适用于什么条件？",
+        "rationale": "两类方法都声称低标注下有效，但训练目标与适配阶段不同，缺少在同一预算曲线上的对照。",
+        "methodology": "在 1-shot、5-shot 与全监督三种预算下比较 episodic 训练与仅更新归一化层的微调，并固定骨干与数据划分。",
+        "expectedOutcome": "给出按标注预算与目标域差异划分的方法选择准则，并量化各自的适用边界。"
+      },
+      {
+        "id": "q3",
+        "question": "不确定性感知的伪标签能否在无额外无标注数据的条件下稳定提升目标域 Dice？",
+        "rationale": "伪标签可能放大确认偏差，尤其在低质量扫描与类别不平衡条件下，需要以置信度门槛控制风险。",
+        "methodology": "使用预测熵与 MC Dropout 方差不一致性筛选伪标签，在目标域训练集上执行两轮自训练，并系统扫描置信度阈值。",
+        "expectedOutcome": "确定伪标签带来稳定收益的置信度区间，并给出收益消失或转为负向的边界条件。"
+      }
+    ],
+    "searchKeywords": [
+      {
+        "id": "kw1",
+        "label": "Core Problem",
+        "keywords": [
+          "few-shot medical image segmentation",
+          "cross-center domain shift",
+          "leave-one-center-out evaluation",
+          "annotation budget"
+        ],
+        "purpose": "定位跨中心小样本分割的核心问题与可复现的评测协议。"
+      },
+      {
+        "id": "kw2",
+        "label": "Method & Evaluation",
+        "keywords": [
+          "episodic meta-learning",
+          "parameter-efficient fine-tuning",
+          "test-time adaptation",
+          "uncertainty-aware pseudo-labeling",
+          "Dice and HD95"
+        ],
+        "purpose": "检索方法类工作与医学分割常用评价指标，支撑方法权衡分析。"
+      }
+    ]
+  },
+  "literature": [
+    {
+      "id": "lit-unet-2015",
+      "title": "U-Net: Convolutional Networks for Biomedical Image Segmentation",
+      "authors": [
+        "Olaf Ronneberger",
+        "Philipp Fischer",
+        "Thomas Brox"
+      ],
+      "year": 2015,
+      "venue": "MICCAI 2015",
+      "abstract": "提出对称编码器—解码器结构与跳跃连接，并结合强数据增强，在有限标注的医学图像上取得高精度分割，成为后续小样本分割工作的常用骨干与可复核基线。",
+      "relevance": "high",
+      "sourceType": "real",
+      "doi": "10.1007/978-3-319-24574-4_28",
+      "url": "https://doi.org/10.1007/978-3-319-24574-4_28",
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "lit-center-shift",
+      "title": "Cross-Center Distribution Shift in Few-Shot Medical Segmentation: A Simulated Benchmark",
+      "authors": [
+        "Simulated Author A",
+        "Simulated Author B"
+      ],
+      "year": 2025,
+      "venue": "Simulated Benchmark Report (Demo Only)",
+      "abstract": "模拟基准报告称，设备与协议变化导致的 Dice 下降并不均匀，最差中心往往由标注规范差异驱动；该线索为演示数据，未经过同行评审。",
+      "relevance": "high",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q1"
+      ]
+    },
+    {
+      "id": "lit-episodic-budget",
+      "title": "Episodic Sampling under Limited Annotation Budgets for Organ Segmentation",
+      "authors": [
+        "Simulated Author C",
+        "Simulated Author D"
+      ],
+      "year": 2024,
+      "venue": "Simulated Workshop on Medical Vision (Demo Only)",
+      "abstract": "模拟研究显示，episodic 训练对任务采样与类别平衡较为敏感，在 5-shot 以下预算中收益明显，但跨协议迁移时可能低于轻量微调。",
+      "relevance": "high",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "lit-tta-device",
+      "title": "Lightweight Test-Time Adaptation for Cross-Device Dense Prediction",
+      "authors": [
+        "Simulated Author E",
+        "Simulated Author F"
+      ],
+      "year": 2025,
+      "venue": "Simulated Transactions on Medical Imaging (Demo Only)",
+      "abstract": "模拟结果表明，仅更新归一化层与少量偏置即可缓解同协议内的域偏移，但跨设备时更新幅度过大会导致过拟合，需要显式约束。",
+      "relevance": "medium",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q1",
+        "q2"
+      ]
+    },
+    {
+      "id": "lit-confidence-pseudo",
+      "title": "Confidence-Gated Pseudo-Labeling without External Unlabeled Data",
+      "authors": [
+        "Simulated Author G"
+      ],
+      "year": 2023,
+      "venue": "Simulated Conference on Low-Data Learning (Demo Only)",
+      "abstract": "模拟实验使用预测熵作为置信度门槛，在无外部无标注数据的设定下取得有限但稳定的提升；阈值过低时确认偏差显著放大。",
+      "relevance": "medium",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q3"
+      ]
+    }
+  ],
+  "review": [
+    {
+      "id": "rev-med-1",
+      "title": "跨中心实验设置无法覆盖复合域偏移",
+      "severity": "high",
+      "category": "dataset",
+      "problem": "当前只规划单一留出中心，设备厂商、成像协议与标注规范的影响被混在一起，无法回答 q1 中哪类偏移主导性能衰减。",
+      "impact": "若因素不可分离，后续方法收益难以归因，结论可能只在特定中心成立，无法支持临床部署判断。",
+      "recommendation": "至少纳入三个中心，按设备与协议分层执行 leave-one-center-out，并单独报告最差中心与复合偏移组合的结果。",
+      "relatedQuestionIds": [
+        "q1"
+      ]
+    },
+    {
+      "id": "rev-med-2",
+      "title": "缺少与标注预算对齐的全监督基线",
+      "severity": "high",
+      "category": "evaluation",
+      "problem": "仅与全监督 U-Net 的最终成绩比较，会把标注量差异误判为方法收益，无法检验 q2 提出的精度—成本权衡。",
+      "impact": "方法效果可能被系统性高估，且在 5-shot 条件下是否值得引入 episodic 训练缺乏可解释依据。",
+      "recommendation": "在相同标注预算下增加全监督基线，绘制 1-shot、5-shot 与全监督的预算—Dice 曲线，并报告交叉点。",
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "rev-med-3",
+      "title": "统计功效与不确定性报告不足",
+      "severity": "medium",
+      "category": "statistics",
+      "problem": "小样本实验对随机划分敏感，方案只报告单次结果，未说明种子数、置信区间与显著性检验，尤其影响伪标签阈值扫描的结论。",
+      "impact": "偶然波动可能被误读为方法收益，使 q3 的伪标签结论缺乏稳定性证据。",
+      "recommendation": "使用至少五个随机种子，报告均值、标准差与 95% 置信区间，并补充配对检验与阈值敏感性分析。",
+      "relatedQuestionIds": [
+        "q2",
+        "q3"
+      ]
+    }
+  ],
+  "finalReport": "## 1. 研究背景\n\n小样本医学图像分割要求在仅有少量标注样本的前提下，把模型迁移到新的机构、设备与成像协议。U-Net 及其数据增强策略证明了有限标注条件下分割的可行性，但跨中心部署时，强度分布、解剖形态与标注规范差异会共同造成性能衰减。**Evidence**：真实文献表明强增强与跳跃连接能稳定训练，但并未回答域偏移的来源与可控因素。\n\n本研究把问题限定为标注预算受限时的跨域泛化改进，优先保证实验设置可复现，而不是追求单次榜单提升。\n\n## 2. 核心研究问题\n\n1. 跨中心分布偏移下，小样本分割模型的泛化性能主要由哪些因素主导？\n2. 情景式元学习与参数高效微调在精度—标注成本权衡上各自适用于什么条件？\n3. 不确定性感知的伪标签能否在无额外无标注数据的条件下稳定提升目标域 Dice？\n\n## 3. 相关研究与证据\n\n**Evidence**：U-Net（MICCAI 2015）提供了可复核的编码器—解码器基线。四条模拟线索给出待核验的观察：复合偏移下最差中心可能由标注规范驱动；episodic 采样对任务分布与标注预算敏感；仅更新归一化层的测试时适应在跨设备时存在过拟合风险；伪标签收益依赖置信度门槛与类别平衡。模拟线索仅用于演示，不能作为既有结论引用。\n\n## 4. 研究假设\n\n**Hypothesis**：在设备与协议分层后，标注规范差异将是跨中心 Dice 下降的主导因素；当标注预算低于 5-shot 时，域感知 episodic 训练的收益高于轻量测试时适应；当置信度门槛高于 0.8 时，伪标签可带来稳定但有限的提升。\n\n## 5. 技术路线\n\n**Proposal**：阶段一构造设备、协议与机构分层的 episode 采样，训练共享骨干；阶段二在目标域仅更新归一化层与注意力偏置，并限制更新幅度；阶段三在目标域训练集上使用熵与 MC Dropout 不一致性筛选伪标签，执行两轮自训练。三个阶段共用同一骨干、数据划分与预算曲线，避免引入额外的推理成本。\n\n## 6. 实验设计\n\n| 设置 | 源域 | 目标域 | 目的 |\n| --- | --- | --- | --- |\n| A | 中心 1–2 | 中心 3 | 同协议跨中心泛化 |\n| B | 中心 1–3 | 中心 4（新设备） | 跨设备鲁棒性 |\n| C | 全部源域 | 低质量扫描子集 | 退化条件下的稳定性 |\n\n每个设置执行 leave-one-center-out，预算曲线包含 1-shot、5-shot 与全监督，并固定骨干、优化器与数据划分。所有结果报告至少五个随机种子的均值与 95% 置信区间。\n\n## 7. 评价指标\n\n主要指标使用 Dice 与 IoU，边界质量使用 HD95，同时记录推理时延与可训练参数比例：\n\n$$\\mathrm{Dice}(P,G)=\\frac{2\\,|P\\cap G|}{|P|+|G|},\\qquad \\mathrm{IoU}(P,G)=\\frac{|P\\cap G|}{|P\\cup G|}$$\n\n$$\\mathrm{HD95}(P,G)=P_{95}\\big(\\{\\,d(p,\\partial G)\\mid p\\in\\partial P\\,\\}\\cup\\{\\,d(g,\\partial P)\\mid g\\in\\partial G\\,\\}\\big)$$\n\n## 8. 潜在风险\n\n- 复合域偏移覆盖不足：单中心留出会混淆设备、协议与标注规范的影响。\n- 基线不公平：未按标注预算对齐的全监督基线会高估方法收益。\n- 统计功效有限：种子数过少会放大偶然波动，尤其是伪标签阈值扫描。\n- 模拟线索未经验证：所有模拟研究只能作为待检验假设，不能进入结论。\n\n## 9. 下一步研究建议\n\n1. 先完成三中心试点与设备分层，确认偏移主导因素。\n2. 在同一预算曲线上补齐标注预算对齐的全监督基线。\n3. 对伪标签阈值执行小规模功效分析，确定种子数与置信区间报告方式。\n4. 将真实文献核验流程纳入正式研究，替换全部模拟线索。\n\n> DEMO DATA：本报告由本地模拟数据与可复核的 U-Net 基线组合生成，仅用于产品演示，不构成科研结论。",
+  "events": [
+    {
+      "id": "ev-med-01",
+      "type": "session_created",
+      "agentId": null,
+      "timestamp": "2026-11-17T09:00:00.000Z",
+      "message": "已创建小样本医学图像分割泛化性研究会话，等待四个 Agent 串行执行。",
+      "payload": {
+        "case": "medical",
+        "mode": "demo"
+      }
+    },
+    {
+      "id": "ev-med-02",
+      "type": "agent_started",
+      "agentId": "planner",
+      "timestamp": "2026-11-17T09:00:05.000Z",
+      "message": "Planner 开始拆解研究问题并生成英文检索词。"
+    },
+    {
+      "id": "ev-med-03",
+      "type": "agent_progress",
+      "agentId": "planner",
+      "timestamp": "2026-11-17T09:00:06.000Z",
+      "message": "Planner 正在合并临床约束与可验证性要求。",
+      "payload": {
+        "stage": "question-formulation",
+        "progress": 60
+      }
+    },
+    {
+      "id": "ev-med-04",
+      "type": "agent_completed",
+      "agentId": "planner",
+      "timestamp": "2026-11-17T09:00:07.000Z",
+      "message": "Planner 输出 3 个研究问题与 2 组检索词。",
+      "payload": {
+        "questionCount": 3,
+        "keywordGroupCount": 2
+      }
+    },
+    {
+      "id": "ev-med-05",
+      "type": "agent_started",
+      "agentId": "researcher",
+      "timestamp": "2026-11-17T09:00:08.000Z",
+      "message": "Researcher 开始按检索词整理可追溯研究线索。"
+    },
+    {
+      "id": "ev-med-06",
+      "type": "agent_progress",
+      "agentId": "researcher",
+      "timestamp": "2026-11-17T09:00:09.000Z",
+      "message": "Researcher 正在映射线索与研究问题，并标记模拟来源。",
+      "payload": {
+        "stage": "literature-mapping",
+        "progress": 45
+      }
+    },
+    {
+      "id": "ev-med-07",
+      "type": "agent_completed",
+      "agentId": "researcher",
+      "timestamp": "2026-11-17T09:00:11.000Z",
+      "message": "Researcher 输出 5 条研究线索，其中 1 条真实、4 条模拟。",
+      "payload": {
+        "clueCount": 5,
+        "realCount": 1,
+        "simulatedCount": 4
+      }
+    },
+    {
+      "id": "ev-med-08",
+      "type": "agent_started",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-17T09:00:12.000Z",
+      "message": "Reviewer 开始审查实验设置、基线与统计计划。"
+    },
+    {
+      "id": "ev-med-09",
+      "type": "agent_progress",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-17T09:00:13.000Z",
+      "message": "Reviewer 正在核对跨中心覆盖与标注预算对齐情况。",
+      "payload": {
+        "stage": "risk-review",
+        "progress": 70
+      }
+    },
+    {
+      "id": "ev-med-10",
+      "type": "agent_completed",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-17T09:00:14.000Z",
+      "message": "Reviewer 输出 3 条审查意见，其中 2 条为高风险。",
+      "payload": {
+        "reviewCount": 3,
+        "highSeverity": 2
+      }
+    },
+    {
+      "id": "ev-med-11",
+      "type": "agent_started",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-17T09:00:15.000Z",
+      "message": "Synthesizer 开始汇总研究计划、线索与审查意见。"
+    },
+    {
+      "id": "ev-med-12",
+      "type": "agent_progress",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-17T09:00:16.000Z",
+      "message": "Synthesizer 正在撰写九章节报告并校验公式。",
+      "payload": {
+        "stage": "report-writing",
+        "progress": 55
+      }
+    },
+    {
+      "id": "ev-med-13",
+      "type": "agent_completed",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-17T09:00:18.000Z",
+      "message": "Synthesizer 输出完整研究报告。",
+      "payload": {
+        "sectionCount": 9
+      }
+    },
+    {
+      "id": "ev-med-14",
+      "type": "session_completed",
+      "agentId": null,
+      "timestamp": "2026-11-17T09:00:19.000Z",
+      "message": "会话完成：四个 Agent 全部成功，产物已通过结构校验。",
+      "payload": {
+        "agentCount": 4,
+        "status": "completed"
+      }
+    }
+  ]
+}

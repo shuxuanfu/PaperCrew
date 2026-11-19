@@ -1,0 +1,631 @@
+{
+  "sessionId": "demo-multiagent",
+  "title": "基于多智能体协作的复杂科研问题求解",
+  "description": "面向复杂科研任务的多 Agent 协作研究推演，覆盖任务分解、协作协议、通信成本、失败模式与九章节研究报告。",
+  "topic": "基于多智能体协作的复杂科研问题求解",
+  "mode": "demo",
+  "status": "completed",
+  "createdAt": "2026-11-18T02:30:00.000Z",
+  "agents": [
+    {
+      "id": "planner",
+      "name": "Planner",
+      "role": "研究规划师 · Research Planning",
+      "description": "把多 Agent 协作问题拆解为分解粒度、通信协议与失败恢复三个研究问题。",
+      "status": "completed",
+      "input": {
+        "topic": "基于多智能体协作的复杂科研问题求解",
+        "objective": "围绕任务分解、协作协议与失败恢复拆解出三个可实验的研究问题，并生成英文检索词。",
+        "context": [
+          "复杂科研任务包含检索、验证、写作与评审等多种能力",
+          "协作系统同时追求成功率、成本可控与失败可恢复"
+        ],
+        "constraints": [
+          "每个问题必须能在固定模型与任务集上做对照实验",
+          "必须定义可验证的里程碑与成本口径"
+        ]
+      },
+      "output": {
+        "type": "planner",
+        "summary": "将课题拆解为任务分解、协作协议与失败恢复三个问题，并生成两组面向协作系统的英文检索词。",
+        "researchQuestions": [
+          {
+            "id": "q1",
+            "question": "复杂科研任务应如何在能力异构的 Agent 之间分解与分配？",
+            "rationale": "任务粒度决定上下文负载、验证成本与通信轮次，缺少可操作的分解决策依据会导致返工与错误传播。",
+            "methodology": "构建分层任务图，对比人工分解、模型分解与混合分解三种策略，以子任务可验证率与返工率作为主要度量。",
+            "expectedOutcome": "得到任务复杂度与推荐分解粒度的对应关系，并给出角色分配的最低约束。"
+          },
+          {
+            "id": "q2",
+            "question": "何种协作与通信协议能在保证任务成功率的同时降低通信开销？",
+            "rationale": "中心协调、广播与稀疏点对点协议在一致性、延迟与冗余消息上的权衡不同，缺少统一定量对比。",
+            "methodology": "固定任务集与模型能力，对比三类协议的轮次、消息量、冲突率与任务成功率，并记录每完成一个子任务的通信成本。",
+            "expectedOutcome": "形成按任务复杂度与通信预算选择协议的准则，并给出可观测指标。"
+          },
+          {
+            "id": "q3",
+            "question": "多 Agent 系统的主要失败模式是什么，如何设计可恢复的执行流程？",
+            "rationale": "错误传播、角色漂移与缺少验证会让系统输出看似合理但不可靠的结论，而现有工作很少系统化报告失败案例。",
+            "methodology": "对失败运行做根因标注，引入阶段门控与独立验证 Agent，并在故障注入条件下测量恢复率与二次失败率。",
+            "expectedOutcome": "得到失败模式分类法、最小可恢复协议与故障注入测试集。"
+          }
+        ],
+        "searchKeywords": [
+          {
+            "id": "kw1",
+            "label": "Decomposition & Coordination",
+            "keywords": [
+              "multi-agent task decomposition",
+              "LLM agent orchestration",
+              "communication topology",
+              "role assignment"
+            ],
+            "purpose": "定位任务分解与协作协议相关的方法工作。"
+          },
+          {
+            "id": "kw2",
+            "label": "Evaluation & Reliability",
+            "keywords": [
+              "multi-agent success rate",
+              "coordination efficiency",
+              "communication overhead",
+              "failure recovery",
+              "agent verification"
+            ],
+            "purpose": "检索协作系统的评价指标、失败分析与可靠性机制。"
+          }
+        ]
+      },
+      "startedAt": "2026-11-18T02:30:05.000Z",
+      "completedAt": "2026-11-18T02:30:07.500Z",
+      "durationMs": 2500,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "role": "文献研究员 · Literature Discovery",
+      "description": "检索多 Agent 协作与可靠性研究线索，区分真实论文与模拟研究。",
+      "status": "completed",
+      "input": {
+        "topic": "基于多智能体协作的复杂科研问题求解",
+        "objective": "围绕三个研究问题整理至少五条可追溯线索，覆盖框架、拓扑、任务粒度与失败恢复。",
+        "context": [
+          "Planner 输出任务分解、协议选择与失败恢复三个问题",
+          "真实文献必须可复核，模拟线索不得携带 DOI 或链接"
+        ],
+        "constraints": [
+          "不得虚构真实论文元数据",
+          "每条线索必须关联至少一个研究问题"
+        ]
+      },
+      "output": {
+        "type": "researcher",
+        "summary": "整理 5 条线索（1 条真实、4 条模拟），覆盖 AutoGen 框架、通信拓扑、任务粒度、失败分类与验证 Agent。",
+        "literature": [
+          {
+            "id": "lit-autogen-2023",
+            "title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+            "authors": [
+              "Qingyun Wu",
+              "Gagan Bansal",
+              "Chi Wang"
+            ],
+            "year": 2023,
+            "venue": "arXiv preprint arXiv:2308.08155",
+            "abstract": "提出可通过多 Agent 对话组合 LLM 应用的开源框架，支持可配置的对话式 Agent 与工具调用，并展示多 Agent 协作在复杂任务中的可行性。",
+            "relevance": "high",
+            "sourceType": "real",
+            "doi": null,
+            "url": "https://arxiv.org/abs/2308.08155",
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "lit-topology-tradeoffs",
+            "title": "Communication Topology Trade-offs in LLM Agent Teams: A Simulated Study",
+            "authors": [
+              "Simulated Author H",
+              "Simulated Author I"
+            ],
+            "year": 2025,
+            "venue": "Simulated Multi-Agent Systems Workshop (Demo Only)",
+            "abstract": "模拟研究比较广播、中心协调与稀疏点对点拓扑，报告中心协调在冲突率上更稳定，但每轮消息量更高；该线索为演示数据。",
+            "relevance": "high",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "lit-granularity-failure",
+            "title": "Task Granularity and Failure Propagation in Multi-Agent Research Pipelines",
+            "authors": [
+              "Simulated Author J",
+              "Simulated Author K"
+            ],
+            "year": 2024,
+            "venue": "Simulated Conference on Agentic Systems (Demo Only)",
+            "abstract": "模拟实验显示，过细的任务分解会增加交接错误，过粗的分解使单个 Agent 上下文过载；两种情况下验证缺失都会放大错误传播。",
+            "relevance": "high",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q1",
+              "q3"
+            ]
+          },
+          {
+            "id": "lit-failure-taxonomy",
+            "title": "A Failure Taxonomy for Multi-Agent Research Assistants",
+            "authors": [
+              "Simulated Author L"
+            ],
+            "year": 2025,
+            "venue": "Simulated Review of Agent Reliability (Demo Only)",
+            "abstract": "模拟分类法将失败归为角色漂移、证据幻觉、验证缺位与通信失序四类，并建议为每类设计独立门控与回滚策略。",
+            "relevance": "high",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q3"
+            ]
+          },
+          {
+            "id": "lit-verifier-gates",
+            "title": "Stage Gates and Verifier Agents for Reliable Agent Workflows",
+            "authors": [
+              "Simulated Author M",
+              "Simulated Author N"
+            ],
+            "year": 2024,
+            "venue": "Simulated Workshop on Agent Evaluation (Demo Only)",
+            "abstract": "模拟工作引入独立验证 Agent 与阶段门控，在故障注入下提升恢复率，但增加了约一倍的验证轮次与通信开销。",
+            "relevance": "medium",
+            "sourceType": "simulated",
+            "doi": null,
+            "url": null,
+            "relatedQuestionIds": [
+              "q1",
+              "q2",
+              "q3"
+            ]
+          }
+        ]
+      },
+      "startedAt": "2026-11-18T02:30:08.000Z",
+      "completedAt": "2026-11-18T02:30:11.500Z",
+      "durationMs": 3500,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "role": "学术审稿人 · Critical Review",
+      "description": "审查成功率定义、成本计量与失败恢复设计，指出不可复现的风险。",
+      "status": "completed",
+      "input": {
+        "topic": "基于多智能体协作的复杂科研问题求解",
+        "objective": "审查多 Agent 协作方案的评价与可靠性设计，输出恰好三条可执行意见。",
+        "context": [
+          "研究计划包含四组协议对照与三类故障注入",
+          "重点关注成功率定义、成本归一化与回滚机制"
+        ],
+        "constraints": [
+          "意见必须包含问题、影响与整改建议",
+          "建议必须能在现有实验预算内执行"
+        ]
+      },
+      "output": {
+        "type": "reviewer",
+        "summary": "指出三项关键问题：成功率定义过粗、协作成本缺少统一计量、失败注入与回滚验证不足。",
+        "review": [
+          {
+            "id": "rev-multi-1",
+            "title": "任务成功率定义过于粗粒度",
+            "severity": "high",
+            "category": "evaluation",
+            "problem": "以单次运行是否给出最终答案作为成功率，会掩盖部分正确、证据不可追溯与中间步骤错误等关键差异，无法支撑 q2 的协议比较。",
+            "impact": "不同协议在表面成功率接近时可能可靠性差异巨大，结论会误导后续系统设计。",
+            "recommendation": "引入可验证里程碑评分：子任务完成度、证据引用覆盖率、最终答案正确性分别计分，并对抽样运行做人工核验。",
+            "relatedQuestionIds": [
+              "q2",
+              "q3"
+            ]
+          },
+          {
+            "id": "rev-multi-2",
+            "title": "协作效率与通信开销缺少统一计量单位",
+            "severity": "high",
+            "category": "methodology",
+            "problem": "方案计划记录消息数与轮次，但没有定义有效工作量、token 消耗与完成子任务之间的归一化关系，跨协议比较不可解释。",
+            "impact": "无法判断通信开销增加是否换来了真实的质量提升，q2 的权衡结论可能建立在不可比的指标上。",
+            "recommendation": "为每次运行记录消息数、token、轮次、有效子任务数，并统一按“每完成一个已验证子任务的成本”归一化报告。",
+            "relatedQuestionIds": [
+              "q2"
+            ]
+          },
+          {
+            "id": "rev-multi-3",
+            "title": "缺少失败注入与回滚验证",
+            "severity": "medium",
+            "category": "reproducibility",
+            "problem": "研究计划提出阶段门控，但没有定义故障注入场景、回滚触发条件与二次失败的处理方式，q3 的恢复率无法复现。",
+            "impact": "恢复机制可能只在顺利路径上有效，真实失败场景下会放大错误传播或陷入重复重试。",
+            "recommendation": "构建包含工具超时、错误证据与角色漂移的故障注入集，记录恢复率、回滚次数与二次失败归档，并公开最小复现配置。",
+            "relatedQuestionIds": [
+              "q3"
+            ]
+          }
+        ]
+      },
+      "startedAt": "2026-11-18T02:30:12.000Z",
+      "completedAt": "2026-11-18T02:30:14.500Z",
+      "durationMs": 2500,
+      "error": null,
+      "fallbackReason": null
+    },
+    {
+      "id": "synthesizer",
+      "name": "Synthesizer",
+      "role": "报告综合师 · Research Synthesis",
+      "description": "把规划、线索与审查意见整合为区分证据、假设与方案的研究报告。",
+      "status": "completed",
+      "input": {
+        "topic": "基于多智能体协作的复杂科研问题求解",
+        "objective": "撰写包含九个章节的多 Agent 研究推演报告，并明确区分证据、假设与方案。",
+        "context": [
+          "上游输出包含 3 个问题、5 条线索与 3 条审查意见",
+          "报告需要给出成功率、协作效率与通信开销公式"
+        ],
+        "constraints": [
+          "使用 Markdown 与标准 LaTeX",
+          "不得把模拟线索表述为已验证结论"
+        ]
+      },
+      "output": {
+        "type": "synthesizer",
+        "summary": "生成九章节报告，给出成功率、协作效率与通信开销的归一化指标，并规划故障注入实验。",
+        "finalReport": "## 1. 研究背景\n\n复杂科研任务通常需要问题拆解、文献核查、方法评审与综合写作等多种能力。单一 Agent 容易在长上下文中丢失约束，多 Agent 协作则可能通过角色分工与交叉验证提升可靠性，但同时引入协调成本与失败传播。AutoGen 等多 Agent 对话框架证明了组合式 Agent 应用的可行性，却没有给出协作协议、通信预算与失败恢复的系统性评价方法。\n\n本研究聚焦“协作是否真正带来可验证的科研质量提升”，并把成功率、协作效率与通信开销放在同一评价框架内。\n\n## 2. 核心研究问题\n\n1. 复杂科研任务应如何在能力异构的 Agent 之间分解与分配？\n2. 何种协作与通信协议能在保证任务成功率的同时降低通信开销？\n3. 多 Agent 系统的主要失败模式是什么，如何设计可恢复的执行流程？\n\n## 3. 相关研究与证据\n\n**Evidence**：AutoGen（arXiv:2308.08155）提供了可复核的多 Agent 对话与工具调用框架，证明组合式协作在复杂任务中的可行性。四条模拟线索给出待核验观察：中心协调拓扑冲突更少但消息更多；任务粒度过细增加交接错误、过粗造成上下文过载；常见失败可归为角色漂移、证据幻觉、验证缺位与通信失序；独立验证 Agent 能提升恢复率但增加约一倍验证轮次。模拟线索只用于形成假设。\n\n## 4. 研究假设\n\n**Hypothesis**：当任务包含三个以上可验证里程碑时，中心协调协议的端到端成功率高于稀疏点对点协议；按“每完成一个已验证子任务的成本”归一化后，混合分解的协作效率最高；引入阶段门控与独立验证后，故障注入下的恢复率显著提升，但通信开销增加不超过一倍。\n\n## 5. 技术路线\n\n**Proposal**：构建分层任务图，把复杂问题分解为可验证里程碑；由协调 Agent 维护任务状态，研究 Agent 与写作 Agent 通过结构化消息交换证据；在关键阶段插入独立验证 Agent 与门控，失败时回滚到最近通过验证的里程碑。所有运行记录消息、token、轮次与里程碑状态，用于归一化比较。\n\n## 6. 实验设计\n\n| 设置 | 分解策略 | 通信协议 | 验证机制 | 目的 |\n| --- | --- | --- | --- | --- |\n| A | 人工分解 | 中心协调 | 无门控 | 建立成功率与成本基线 |\n| B | 模型分解 | 广播 | 无门控 | 检验分解质量与冗余通信 |\n| C | 混合分解 | 稀疏点对点 | 阶段门控 | 检验自组织协作的边界 |\n| D | 混合分解 | 中心协调 | 独立验证 Agent | 检验可靠性与成本权衡 |\n\n同一任务集使用固定模型版本与温度，每个设置重复至少八次，并执行工具超时、错误证据与角色漂移三类故障注入。\n\n## 7. 评价指标\n\n任务成功率按可验证里程碑阈值计算，协作效率按有效工作与成本之比衡量，通信开销按消息数与 token 归一化：\n\n$$\\mathrm{SR}=\\frac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}\\left[s_i\\ge\\tau\\right]$$\n\n$$\\mathrm{CE}=\\frac{\\sum_{k=1}^{K}u_k}{\\sum_{k=1}^{K}c_k},\\qquad \\mathrm{CO}=\\sum_{k=1}^{K}\\left(m_k\\cdot \\ell_k\\right)$$\n\n其中 $s_i$ 为第 $i$ 次运行的里程碑得分，$u_k$ 为有效工作量，$c_k$ 为归一化成本，$m_k$ 与 $\\ell_k$ 分别为消息数与平均 token 长度。另报告恢复率、二次失败率与平均回滚次数。\n\n## 8. 潜在风险\n\n- 成功率定义粗粒度：若只看最终答案，会掩盖部分正确与证据不可追溯的问题。\n- 指标不可比：不同协议的成本单位不统一时，协作效率结论失真。\n- 失败传播：缺少门控与验证可能让错误证据进入最终报告。\n- 过度验证：验证 Agent 可能显著增加成本并引入新的相互确认偏差。\n- 模拟线索未经验证：模拟研究只能形成假设，不能作为结论引用。\n\n## 9. 下一步研究建议\n\n1. 先统一里程碑评分与成本归一化规范，再启动跨协议比较。\n2. 构建故障注入集与回滚日志，优先覆盖角色漂移和错误证据。\n3. 对小规模试点做功效分析，确定重复次数与置信区间报告方式。\n4. 将可复核的真实文献与开源实现纳入正式实验，替换模拟线索。\n\n> DEMO DATA：本报告由本地模拟数据与可复核的 AutoGen 文献组合生成，仅用于产品演示，不构成科研结论。"
+      },
+      "startedAt": "2026-11-18T02:30:15.000Z",
+      "completedAt": "2026-11-18T02:30:19.000Z",
+      "durationMs": 4000,
+      "error": null,
+      "fallbackReason": null
+    }
+  ],
+  "researchPlan": {
+    "researchQuestions": [
+      {
+        "id": "q1",
+        "question": "复杂科研任务应如何在能力异构的 Agent 之间分解与分配？",
+        "rationale": "任务粒度决定上下文负载、验证成本与通信轮次，缺少可操作的分解决策依据会导致返工与错误传播。",
+        "methodology": "构建分层任务图，对比人工分解、模型分解与混合分解三种策略，以子任务可验证率与返工率作为主要度量。",
+        "expectedOutcome": "得到任务复杂度与推荐分解粒度的对应关系，并给出角色分配的最低约束。"
+      },
+      {
+        "id": "q2",
+        "question": "何种协作与通信协议能在保证任务成功率的同时降低通信开销？",
+        "rationale": "中心协调、广播与稀疏点对点协议在一致性、延迟与冗余消息上的权衡不同，缺少统一定量对比。",
+        "methodology": "固定任务集与模型能力，对比三类协议的轮次、消息量、冲突率与任务成功率，并记录每完成一个子任务的通信成本。",
+        "expectedOutcome": "形成按任务复杂度与通信预算选择协议的准则，并给出可观测指标。"
+      },
+      {
+        "id": "q3",
+        "question": "多 Agent 系统的主要失败模式是什么，如何设计可恢复的执行流程？",
+        "rationale": "错误传播、角色漂移与缺少验证会让系统输出看似合理但不可靠的结论，而现有工作很少系统化报告失败案例。",
+        "methodology": "对失败运行做根因标注，引入阶段门控与独立验证 Agent，并在故障注入条件下测量恢复率与二次失败率。",
+        "expectedOutcome": "得到失败模式分类法、最小可恢复协议与故障注入测试集。"
+      }
+    ],
+    "searchKeywords": [
+      {
+        "id": "kw1",
+        "label": "Decomposition & Coordination",
+        "keywords": [
+          "multi-agent task decomposition",
+          "LLM agent orchestration",
+          "communication topology",
+          "role assignment"
+        ],
+        "purpose": "定位任务分解与协作协议相关的方法工作。"
+      },
+      {
+        "id": "kw2",
+        "label": "Evaluation & Reliability",
+        "keywords": [
+          "multi-agent success rate",
+          "coordination efficiency",
+          "communication overhead",
+          "failure recovery",
+          "agent verification"
+        ],
+        "purpose": "检索协作系统的评价指标、失败分析与可靠性机制。"
+      }
+    ]
+  },
+  "literature": [
+    {
+      "id": "lit-autogen-2023",
+      "title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+      "authors": [
+        "Qingyun Wu",
+        "Gagan Bansal",
+        "Chi Wang"
+      ],
+      "year": 2023,
+      "venue": "arXiv preprint arXiv:2308.08155",
+      "abstract": "提出可通过多 Agent 对话组合 LLM 应用的开源框架，支持可配置的对话式 Agent 与工具调用，并展示多 Agent 协作在复杂任务中的可行性。",
+      "relevance": "high",
+      "sourceType": "real",
+      "doi": null,
+      "url": "https://arxiv.org/abs/2308.08155",
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "lit-topology-tradeoffs",
+      "title": "Communication Topology Trade-offs in LLM Agent Teams: A Simulated Study",
+      "authors": [
+        "Simulated Author H",
+        "Simulated Author I"
+      ],
+      "year": 2025,
+      "venue": "Simulated Multi-Agent Systems Workshop (Demo Only)",
+      "abstract": "模拟研究比较广播、中心协调与稀疏点对点拓扑，报告中心协调在冲突率上更稳定，但每轮消息量更高；该线索为演示数据。",
+      "relevance": "high",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "lit-granularity-failure",
+      "title": "Task Granularity and Failure Propagation in Multi-Agent Research Pipelines",
+      "authors": [
+        "Simulated Author J",
+        "Simulated Author K"
+      ],
+      "year": 2024,
+      "venue": "Simulated Conference on Agentic Systems (Demo Only)",
+      "abstract": "模拟实验显示，过细的任务分解会增加交接错误，过粗的分解使单个 Agent 上下文过载；两种情况下验证缺失都会放大错误传播。",
+      "relevance": "high",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q1",
+        "q3"
+      ]
+    },
+    {
+      "id": "lit-failure-taxonomy",
+      "title": "A Failure Taxonomy for Multi-Agent Research Assistants",
+      "authors": [
+        "Simulated Author L"
+      ],
+      "year": 2025,
+      "venue": "Simulated Review of Agent Reliability (Demo Only)",
+      "abstract": "模拟分类法将失败归为角色漂移、证据幻觉、验证缺位与通信失序四类，并建议为每类设计独立门控与回滚策略。",
+      "relevance": "high",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q3"
+      ]
+    },
+    {
+      "id": "lit-verifier-gates",
+      "title": "Stage Gates and Verifier Agents for Reliable Agent Workflows",
+      "authors": [
+        "Simulated Author M",
+        "Simulated Author N"
+      ],
+      "year": 2024,
+      "venue": "Simulated Workshop on Agent Evaluation (Demo Only)",
+      "abstract": "模拟工作引入独立验证 Agent 与阶段门控，在故障注入下提升恢复率，但增加了约一倍的验证轮次与通信开销。",
+      "relevance": "medium",
+      "sourceType": "simulated",
+      "doi": null,
+      "url": null,
+      "relatedQuestionIds": [
+        "q1",
+        "q2",
+        "q3"
+      ]
+    }
+  ],
+  "review": [
+    {
+      "id": "rev-multi-1",
+      "title": "任务成功率定义过于粗粒度",
+      "severity": "high",
+      "category": "evaluation",
+      "problem": "以单次运行是否给出最终答案作为成功率，会掩盖部分正确、证据不可追溯与中间步骤错误等关键差异，无法支撑 q2 的协议比较。",
+      "impact": "不同协议在表面成功率接近时可能可靠性差异巨大，结论会误导后续系统设计。",
+      "recommendation": "引入可验证里程碑评分：子任务完成度、证据引用覆盖率、最终答案正确性分别计分，并对抽样运行做人工核验。",
+      "relatedQuestionIds": [
+        "q2",
+        "q3"
+      ]
+    },
+    {
+      "id": "rev-multi-2",
+      "title": "协作效率与通信开销缺少统一计量单位",
+      "severity": "high",
+      "category": "methodology",
+      "problem": "方案计划记录消息数与轮次，但没有定义有效工作量、token 消耗与完成子任务之间的归一化关系，跨协议比较不可解释。",
+      "impact": "无法判断通信开销增加是否换来了真实的质量提升，q2 的权衡结论可能建立在不可比的指标上。",
+      "recommendation": "为每次运行记录消息数、token、轮次、有效子任务数，并统一按“每完成一个已验证子任务的成本”归一化报告。",
+      "relatedQuestionIds": [
+        "q2"
+      ]
+    },
+    {
+      "id": "rev-multi-3",
+      "title": "缺少失败注入与回滚验证",
+      "severity": "medium",
+      "category": "reproducibility",
+      "problem": "研究计划提出阶段门控，但没有定义故障注入场景、回滚触发条件与二次失败的处理方式，q3 的恢复率无法复现。",
+      "impact": "恢复机制可能只在顺利路径上有效，真实失败场景下会放大错误传播或陷入重复重试。",
+      "recommendation": "构建包含工具超时、错误证据与角色漂移的故障注入集，记录恢复率、回滚次数与二次失败归档，并公开最小复现配置。",
+      "relatedQuestionIds": [
+        "q3"
+      ]
+    }
+  ],
+  "finalReport": "## 1. 研究背景\n\n复杂科研任务通常需要问题拆解、文献核查、方法评审与综合写作等多种能力。单一 Agent 容易在长上下文中丢失约束，多 Agent 协作则可能通过角色分工与交叉验证提升可靠性，但同时引入协调成本与失败传播。AutoGen 等多 Agent 对话框架证明了组合式 Agent 应用的可行性，却没有给出协作协议、通信预算与失败恢复的系统性评价方法。\n\n本研究聚焦“协作是否真正带来可验证的科研质量提升”，并把成功率、协作效率与通信开销放在同一评价框架内。\n\n## 2. 核心研究问题\n\n1. 复杂科研任务应如何在能力异构的 Agent 之间分解与分配？\n2. 何种协作与通信协议能在保证任务成功率的同时降低通信开销？\n3. 多 Agent 系统的主要失败模式是什么，如何设计可恢复的执行流程？\n\n## 3. 相关研究与证据\n\n**Evidence**：AutoGen（arXiv:2308.08155）提供了可复核的多 Agent 对话与工具调用框架，证明组合式协作在复杂任务中的可行性。四条模拟线索给出待核验观察：中心协调拓扑冲突更少但消息更多；任务粒度过细增加交接错误、过粗造成上下文过载；常见失败可归为角色漂移、证据幻觉、验证缺位与通信失序；独立验证 Agent 能提升恢复率但增加约一倍验证轮次。模拟线索只用于形成假设。\n\n## 4. 研究假设\n\n**Hypothesis**：当任务包含三个以上可验证里程碑时，中心协调协议的端到端成功率高于稀疏点对点协议；按“每完成一个已验证子任务的成本”归一化后，混合分解的协作效率最高；引入阶段门控与独立验证后，故障注入下的恢复率显著提升，但通信开销增加不超过一倍。\n\n## 5. 技术路线\n\n**Proposal**：构建分层任务图，把复杂问题分解为可验证里程碑；由协调 Agent 维护任务状态，研究 Agent 与写作 Agent 通过结构化消息交换证据；在关键阶段插入独立验证 Agent 与门控，失败时回滚到最近通过验证的里程碑。所有运行记录消息、token、轮次与里程碑状态，用于归一化比较。\n\n## 6. 实验设计\n\n| 设置 | 分解策略 | 通信协议 | 验证机制 | 目的 |\n| --- | --- | --- | --- | --- |\n| A | 人工分解 | 中心协调 | 无门控 | 建立成功率与成本基线 |\n| B | 模型分解 | 广播 | 无门控 | 检验分解质量与冗余通信 |\n| C | 混合分解 | 稀疏点对点 | 阶段门控 | 检验自组织协作的边界 |\n| D | 混合分解 | 中心协调 | 独立验证 Agent | 检验可靠性与成本权衡 |\n\n同一任务集使用固定模型版本与温度，每个设置重复至少八次，并执行工具超时、错误证据与角色漂移三类故障注入。\n\n## 7. 评价指标\n\n任务成功率按可验证里程碑阈值计算，协作效率按有效工作与成本之比衡量，通信开销按消息数与 token 归一化：\n\n$$\\mathrm{SR}=\\frac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}\\left[s_i\\ge\\tau\\right]$$\n\n$$\\mathrm{CE}=\\frac{\\sum_{k=1}^{K}u_k}{\\sum_{k=1}^{K}c_k},\\qquad \\mathrm{CO}=\\sum_{k=1}^{K}\\left(m_k\\cdot \\ell_k\\right)$$\n\n其中 $s_i$ 为第 $i$ 次运行的里程碑得分，$u_k$ 为有效工作量，$c_k$ 为归一化成本，$m_k$ 与 $\\ell_k$ 分别为消息数与平均 token 长度。另报告恢复率、二次失败率与平均回滚次数。\n\n## 8. 潜在风险\n\n- 成功率定义粗粒度：若只看最终答案，会掩盖部分正确与证据不可追溯的问题。\n- 指标不可比：不同协议的成本单位不统一时，协作效率结论失真。\n- 失败传播：缺少门控与验证可能让错误证据进入最终报告。\n- 过度验证：验证 Agent 可能显著增加成本并引入新的相互确认偏差。\n- 模拟线索未经验证：模拟研究只能形成假设，不能作为结论引用。\n\n## 9. 下一步研究建议\n\n1. 先统一里程碑评分与成本归一化规范，再启动跨协议比较。\n2. 构建故障注入集与回滚日志，优先覆盖角色漂移和错误证据。\n3. 对小规模试点做功效分析，确定重复次数与置信区间报告方式。\n4. 将可复核的真实文献与开源实现纳入正式实验，替换模拟线索。\n\n> DEMO DATA：本报告由本地模拟数据与可复核的 AutoGen 文献组合生成，仅用于产品演示，不构成科研结论。",
+  "events": [
+    {
+      "id": "ev-multi-01",
+      "type": "session_created",
+      "agentId": null,
+      "timestamp": "2026-11-18T02:30:00.000Z",
+      "message": "已创建多智能体协作研究会话，四个 Agent 将按串行流水线执行。",
+      "payload": {
+        "case": "multiagent",
+        "mode": "demo"
+      }
+    },
+    {
+      "id": "ev-multi-02",
+      "type": "agent_started",
+      "agentId": "planner",
+      "timestamp": "2026-11-18T02:30:05.000Z",
+      "message": "Planner 开始拆解协作问题与评价口径。"
+    },
+    {
+      "id": "ev-multi-03",
+      "type": "agent_progress",
+      "agentId": "planner",
+      "timestamp": "2026-11-18T02:30:06.000Z",
+      "message": "Planner 正在对齐任务分解、通信协议与失败恢复三个方向。",
+      "payload": {
+        "stage": "question-formulation",
+        "progress": 60
+      }
+    },
+    {
+      "id": "ev-multi-04",
+      "type": "agent_completed",
+      "agentId": "planner",
+      "timestamp": "2026-11-18T02:30:07.500Z",
+      "message": "Planner 输出 3 个研究问题与 2 组检索词。",
+      "payload": {
+        "questionCount": 3,
+        "keywordGroupCount": 2
+      }
+    },
+    {
+      "id": "ev-multi-05",
+      "type": "agent_started",
+      "agentId": "researcher",
+      "timestamp": "2026-11-18T02:30:08.000Z",
+      "message": "Researcher 开始整理协作系统研究线索。"
+    },
+    {
+      "id": "ev-multi-06",
+      "type": "agent_progress",
+      "agentId": "researcher",
+      "timestamp": "2026-11-18T02:30:09.500Z",
+      "message": "Researcher 正在核对真实文献元数据与模拟线索标记。",
+      "payload": {
+        "stage": "literature-mapping",
+        "progress": 50
+      }
+    },
+    {
+      "id": "ev-multi-07",
+      "type": "agent_completed",
+      "agentId": "researcher",
+      "timestamp": "2026-11-18T02:30:11.500Z",
+      "message": "Researcher 输出 5 条线索，其中 1 条真实、4 条模拟。",
+      "payload": {
+        "clueCount": 5,
+        "realCount": 1,
+        "simulatedCount": 4
+      }
+    },
+    {
+      "id": "ev-multi-08",
+      "type": "agent_started",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-18T02:30:12.000Z",
+      "message": "Reviewer 开始审查评价指标与失败恢复设计。"
+    },
+    {
+      "id": "ev-multi-09",
+      "type": "agent_progress",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-18T02:30:13.000Z",
+      "message": "Reviewer 正在核对成功率定义与成本归一化方案。",
+      "payload": {
+        "stage": "risk-review",
+        "progress": 65
+      }
+    },
+    {
+      "id": "ev-multi-10",
+      "type": "agent_completed",
+      "agentId": "reviewer",
+      "timestamp": "2026-11-18T02:30:14.500Z",
+      "message": "Reviewer 输出 3 条审查意见。",
+      "payload": {
+        "reviewCount": 3,
+        "highSeverity": 2
+      }
+    },
+    {
+      "id": "ev-multi-11",
+      "type": "agent_started",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-18T02:30:15.000Z",
+      "message": "Synthesizer 开始撰写多 Agent 研究报告。"
+    },
+    {
+      "id": "ev-multi-12",
+      "type": "agent_progress",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-18T02:30:16.500Z",
+      "message": "Synthesizer 正在校验指标公式与实验矩阵。",
+      "payload": {
+        "stage": "report-writing",
+        "progress": 55
+      }
+    },
+    {
+      "id": "ev-multi-13",
+      "type": "agent_completed",
+      "agentId": "synthesizer",
+      "timestamp": "2026-11-18T02:30:19.000Z",
+      "message": "Synthesizer 输出完整研究报告。",
+      "payload": {
+        "sectionCount": 9
+      }
+    },
+    {
+      "id": "ev-multi-14",
+      "type": "session_completed",
+      "agentId": null,
+      "timestamp": "2026-11-18T02:30:19.500Z",
+      "message": "会话完成：四个 Agent 全部成功，产物已通过结构校验。",
+      "payload": {
+        "agentCount": 4,
+        "status": "completed"
+      }
+    }
+  ]
+}
