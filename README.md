@@ -2,7 +2,7 @@
 
 多智能体论文拆解与科研推演沙盘。四个 Agent（Planner → Researcher → Reviewer → Synthesizer）将研究课题转化为研究问题、文献证据、缺陷评审与科研报告。
 
-当前阶段：**阶段六 · LIVE 模式与真实 LLM Agent 接入**（OpenAI-compatible Provider、ConfigService、四个 Agent Prompt、LLMExecutor、LIVE 会话与 Zod 校验；DEMO 模式保持不变）。
+当前阶段：**阶段六收尾 · LIVE 模式与真实 LLM Agent 接入**（OpenAI-compatible Provider、ConfigService、四个 Agent Prompt、LLMExecutor、LIVE 会话与 Zod 校验；请求全生命周期超时/取消已修复；DEMO 模式保持不变）。
 
 ## 核心功能
 
@@ -28,9 +28,11 @@
 | 模式 | 数据来源 | 是否需要 API | 行为 |
 | --- | --- | --- | --- |
 | **DEMO** | `public/data/*.json` 本地案例 | 否 | 按 `durationMs` 回放时间线与输出，数据经 Zod 校验；适合快速体验与演示 |
-| **LIVE** | 浏览器直连 OpenAI-compatible API | 是 | 串行调用四个 Agent，真实解析与校验模型输出；请求失败直接标记失败，**绝不自动切换到 DEMO** |
+| **LIVE** | 浏览器直连 OpenAI-compatible API | 是 | 串行调用四个 Agent，真实解析与校验模型输出；超时/取消覆盖 fetch 与响应体读取；请求失败直接标记失败，**绝不自动切换到 DEMO** |
 
 LIVE 模式下 Researcher 不会伪造论文标题、作者、DOI 或链接；当前未接入真实文献检索，结果页展示的是模型生成的检索计划，并明确标注尚未核实。
+
+LIVE 请求使用单个 `AbortController` 覆盖完整生命周期（fetch → 读取响应体 → JSON 解析 → 内容提取）。超时与外部取消在整个生命周期内有效；非 2xx 时直接按 HTTP 状态报错，错误体不会覆盖原始状态，也不会阻塞错误返回。
 
 
 ## 技术栈
@@ -97,7 +99,7 @@ npm run dev
 
 > **安全提示**：API Key 将在浏览器环境中使用，localStorage 不是安全密钥存储。仅建议用于个人开发和可信环境下的演示。公开部署应通过后端代理保护密钥。
 
-**请求链路**：`TaskController → Orchestrator → LLMExecutor → OpenAICompatibleProvider → {BaseURL}/chat/completions → JSON 解析 → Zod 校验 → 下一 Agent`。每个 Agent 失败后最多发起一次“仅修结构”的修复请求，仍失败则整次运行标记失败，不消耗额度重试，也不回退 DEMO。
+**请求链路**：`TaskController → Orchestrator → LLMExecutor → OpenAICompatibleProvider → {BaseURL}/chat/completions → 读取响应体 → JSON 解析 → Zod 校验 → 下一 Agent`。每个 Agent 失败后最多发起一次“仅修结构”的修复请求，仍失败则整次运行标记失败，不消耗额度重试，也不回退 DEMO。
 
 ## 常用命令
 
@@ -105,7 +107,7 @@ npm run dev
 | --- | --- |
 | `npm run dev` | 启动开发服务器 |
 | `npm run typecheck` | TypeScript 类型检查 |
-| `npm test` | Vitest：状态机、执行、暂停/恢复、取消、重试、隔离，以及 Provider / Prompt 校验 / LIVE 编排等 32 项测试（全部使用 Mock Provider，不消耗 API 额度） |
+| `npm test` | Vitest：状态机、执行、暂停/恢复、取消、重试、隔离，以及 Provider / 请求生命周期 / Prompt 校验 / LIVE 编排等 38 项测试（全部使用 Mock Provider / Mock fetch，不消耗 API 额度） |
 | `npm run build` | 类型检查 + 生产构建，输出到 `dist/` |
 | `npm run preview` | 本地预览生产构建 |
 
@@ -145,11 +147,11 @@ PaperCrew/
    │  └─ llm/               # llmProvider / openAICompatibleProvider / llmConfig / responseParser / errors
    ├─ domain/               # 纯 TS + Zod，零 React 依赖
    │  ├─ brief.ts           # 研究课题 Schema
-   │  ├─ agent/             # Agent id 与展示定义
-   │  ├─ session/           # 会话模型（P1）
-   │  └─ pipeline/          # Orchestrator（P2）
-   ├─ features/             # 功能目录（后续阶段填充）
-   └─ lib/                  # 无状态工具函数
+   │  ├─ agent/             # Agent id 顺序与展示定义
+   │  ├─ session/           # 预留目录（运行态类型在 types/session.ts）
+   │  └─ pipeline/          # 预留目录（Orchestrator 在 engine/）
+   ├─ features/             # 预留目录（尚未实现功能）
+   └─ lib/                  # 预留目录（暂无工具函数）
 ```
 
 路径别名：`@/*` → `src/*`（Vite 与 TypeScript 同步配置；TS 7 已移除 `baseUrl`，仅使用 `paths`）。
@@ -163,9 +165,10 @@ PaperCrew/
 - 四个独立 Prompt（Planner / Researcher / Reviewer / Synthesizer），明确 Role、Goal、Input、Output Schema 与约束，只输出 JSON
 - `LLMExecutor` 实现与 `DemoExecutor` 相同的 `AgentExecutor` 接口：真实上游输出注入、JSON 解析、Zod 严格校验、最多一次结构修复
 - LIVE 会话由 `LivePlayer` 创建，`TaskController.startLive` 串行调用四个 Agent；DEMO / LIVE 共用 Orchestrator 与状态机
-- 超时、取消（AbortSignal）与错误分级：认证 / 地址 / 模型 / 限流 / 5xx / 网络 / 超时 / 解析 / 校验，均返回可读中文提示，不暴露 Header 或密钥
+- 超时与取消（AbortSignal）覆盖完整请求生命周期：fetch、响应体读取、JSON 解析与内容提取共用一个 `AbortController`；非 2xx 时按 HTTP 状态报错，错误体不会覆盖原状态；完成后统一清理定时器与 abort 监听器
+- 错误分级：认证 / 地址 / 模型 / 限流 / 5xx / 网络 / 超时 / 解析 / 校验，均返回可读中文提示，不暴露 Header 或密钥
 - LIVE 启动前检查配置完整性；请求失败直接标记失败，**绝不静默回退 DEMO**；Researcher 不返回虚构的真实文献（literature 为空，仅输出检索计划）
-- Vitest 新增 17 项 LIVE 测试（Mock Provider）；`npm run typecheck`、`npm test`、`npm run build` 均通过
+- Vitest 新增 23 项 LIVE 测试（Mock Provider / Mock fetch），覆盖正常请求、响应体读取阶段超时/取消、HTTP 状态兼容、错误体阻塞与资源清理；`npm run typecheck`、`npm test`、`npm run build` 均通过
 
 ### 阶段五：多智能体执行引擎
 
@@ -175,7 +178,7 @@ PaperCrew/
 - TaskController 支持 Start / Pause / Resume / Cancel / Retry / Restart；重试只重跑失败 Agent，Restart 新建 Session；generation 计数隔离旧异步任务
 - Session Store 只持有运行态并转发控制命令，执行逻辑保留在 Engine 层；案例切换会取消旧运行并隔离旧事件
 - 结果页随着 Agent 完成逐步解锁；完成或失败 / 取消均有状态提示，失败可一键重试
-- Vitest 覆盖 15 项测试；`npm run typecheck`、`npm test`、`npm run build` 均通过
+- Vitest 覆盖 15 项引擎 / DEMO 测试（当前总计 38 项）；`npm run typecheck`、`npm test`、`npm run build` 均通过
 
 ### 阶段四：Demo 数据系统
 
@@ -203,7 +206,8 @@ Apple 风格三栏工作台、四 Agent 时间线、模拟运行控制、四个�
 - **数据来源**：两套案例中仅 U-Net 与 AutoGen 两条线索标记为 REAL PAPER，DOI / 链接可核验；其余文献均为模拟研究线索，不提供 DOI 或链接。案例 JSON 通过 `import.meta.env.BASE_URL` 加载，兼容 `base: './'` 的静态部署。
 - **校验入口**：`validateDemoSession` 基于 Zod `safeParse` 返回可读问题列表；加载失败时 Workspace / Process / Results 均显示错误与重试按钮，不会静默显示空数据。
 - **API Key**：设置保存在浏览器 `localStorage` 明文，无服务端存储或加密。API Key 将在浏览器环境中使用，localStorage 不是安全密钥存储；仅建议用于个人开发和可信环境下的演示，公开部署应通过后端代理保护密钥。密钥只通过 `ConfigService` 读取，不写入日志、不进入错误信息。
-- **LIVE 失败语义**：模型请求失败、JSON 解析失败或 Zod 校验失败都会让当前 Agent 与 Session 进入 failed；最多自动发起一次“仅修结构”的修复请求，之后不再重试，也不会回退到 DEMO 数据。
+- **请求生命周期**：`OpenAICompatibleProvider` 用单个 `AbortController` 覆盖 fetch、响应体读取、JSON 解析与内容提取；超时与外部取消在完整生命周期内有效，外部取消优先于超时判定；非 2xx 时立即取消并丢弃错误体，原始 HTTP 状态错误优先；超时定时器与 abort 监听器只在 `finally` 中统一清理。
+- **LIVE 失败语义**：模型请求失败、JSON 解析失败或 Zod 校验失败都会让当前 Agent 与 Session 进入 failed；最多自动发起一次“仅修结构”的修复请求，之后不再重试，也不会回退到 DEMO 数据。暂停不会中断在途请求，取消会通过同一个 AbortController 终止请求。
 - **文献边界**：LIVE 阶段未接入真实文献数据库，Researcher 的 `literature` 必须为空数组；结果页展示的是模型生成的检索计划，并明确提示尚未核实。
 
 ## 相关文档

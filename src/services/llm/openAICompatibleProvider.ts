@@ -146,46 +146,69 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const forwardAbort = () => controller.abort()
     signal?.addEventListener('abort', forwardAbort, { once: true })
 
-    let response: Response
-    try {
-      response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${request.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-    } catch {
+    const transportError = (): Error => {
       if (signal?.aborted) {
-        throw new LLMCancelledError()
+        return new LLMCancelledError()
       }
       if (timedOut) {
-        throw new LLMTimeoutError()
+        return new LLMTimeoutError()
       }
-      throw new LLMNetworkError()
+      return new LLMNetworkError()
+    }
+
+    try {
+      let response: Response
+      try {
+        response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${request.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
+      } catch {
+        throw transportError()
+      }
+
+      if (!response.ok) {
+        // The HTTP status is authoritative; never let error-body parsing
+        // replace it or block the error path.
+        const bodyCleanup = response.body?.cancel()
+        if (bodyCleanup) {
+          void bodyCleanup.catch(() => {})
+        }
+        mapHttpError(response.status)
+      }
+
+      let payload: unknown
+      try {
+        payload = (await response.json()) as unknown
+      } catch (error) {
+        if (signal?.aborted) {
+          throw new LLMCancelledError()
+        }
+        if (timedOut) {
+          throw new LLMTimeoutError()
+        }
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new LLMNetworkError()
+        }
+        throw new LLMResponseError(
+          '响应格式错误：接口返回的不是合法 JSON。',
+        )
+      }
+
+      const parsed = readContent(payload)
+      return {
+        content: parsed.content,
+        model: parsed.model || request.model,
+        finishReason: parsed.finishReason,
+      }
     } finally {
       clearTimeout(timer)
       signal?.removeEventListener('abort', forwardAbort)
-    }
-
-    if (!response.ok) {
-      mapHttpError(response.status)
-    }
-
-    let payload: unknown
-    try {
-      payload = (await response.json()) as unknown
-    } catch {
-      throw new LLMResponseError('响应格式错误：接口返回的不是合法 JSON。')
-    }
-
-    const parsed = readContent(payload)
-    return {
-      content: parsed.content,
-      model: parsed.model || request.model,
-      finishReason: parsed.finishReason,
     }
   }
 }

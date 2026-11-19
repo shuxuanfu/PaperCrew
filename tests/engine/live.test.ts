@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LLMExecutor } from '@/agents/llmExecutor'
 import { LivePlayer } from '@/engine/livePlayer'
 import { TaskController } from '@/engine/taskController'
-import { AgentExecutionError, LLMAuthError } from '@/services/llm/errors'
+import {
+  AgentExecutionError,
+  LLMAuthError,
+  LLMCancelledError,
+  LLMTimeoutError,
+} from '@/services/llm/errors'
 import {
   DEFAULT_MAX_TOKENS,
   DEFAULT_TIMEOUT_MS,
@@ -270,6 +275,29 @@ function completionBody(content: string) {
   }
 }
 
+function hangingBodyFetch(onRead?: () => void) {
+  return (_url: string, init: RequestInit): Promise<Response> => {
+    const signal = init.signal
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      body: null,
+      json: () => {
+        onRead?.()
+        return new Promise<unknown>((_resolve, reject) => {
+          const abort = () =>
+            reject(new DOMException('Aborted', 'AbortError'))
+          if (signal?.aborted) {
+            abort()
+            return
+          }
+          signal?.addEventListener('abort', abort, { once: true })
+        })
+      },
+    } as unknown as Response)
+  }
+}
+
 function buildContext(
   agentId: AgentId,
   upstream: UpstreamAgentResult[] = [],
@@ -376,9 +404,11 @@ describe('OpenAI-compatible provider', () => {
   it('maps HTTP errors to friendly, non-sensitive messages', async () => {
     const cases: Array<[number, string]> = [
       [401, '认证失败：请检查 API Key。'],
+      [403, '认证失败：请检查 API Key。'],
       [404, '接口地址错误：请检查 Base URL；若地址正确，请确认 Model Name。'],
       [429, '请求限流：请稍后重试。'],
       [500, '服务商暂时不可用（5xx）：请稍后重试。'],
+      [503, '服务商暂时不可用（5xx）：请稍后重试。'],
     ]
 
     for (const [status, message] of cases) {
@@ -476,6 +506,114 @@ describe('OpenAI-compatible provider', () => {
         messages,
       }),
     ).rejects.toThrow('响应格式错误')
+  })
+})
+
+describe('OpenAI-compatible provider request lifecycle', () => {
+  const messages: LLMMessage[] = [{ role: 'user', content: 'ping' }]
+
+  function request(timeoutMs?: number) {
+    return {
+      baseURL: CONFIG.baseUrl,
+      apiKey: CONFIG.apiKey,
+      model: CONFIG.modelName,
+      messages,
+      timeoutMs,
+    }
+  }
+
+  it('completes a normal request without timeout or cancellation', async () => {
+    vi.stubGlobal('fetch', async () =>
+      jsonResponse(200, completionBody('{"ok":true}')),
+    )
+    const controller = new AbortController()
+    const provider = new OpenAICompatibleProvider()
+
+    const response = await provider.chatCompletion(
+      request(5000),
+      controller.signal,
+    )
+
+    expect(response.content).toBe('{"ok":true}')
+    expect(controller.signal.aborted).toBe(false)
+  })
+
+  it('times out while the response body is still being read', async () => {
+    vi.stubGlobal('fetch', hangingBodyFetch())
+    const provider = new OpenAICompatibleProvider()
+    const startedAt = Date.now()
+
+    const pending = provider.chatCompletion(request(30))
+    await expect(pending).rejects.toBeInstanceOf(LLMTimeoutError)
+    await expect(pending).rejects.toMatchObject({ code: 'timeout' })
+
+    expect(Date.now() - startedAt).toBeLessThan(2000)
+  })
+
+  it('cancels while the response body is still being read', async () => {
+    let bodyReadStarted = false
+    vi.stubGlobal(
+      'fetch',
+      hangingBodyFetch(() => {
+        bodyReadStarted = true
+      }),
+    )
+    const controller = new AbortController()
+    const provider = new OpenAICompatibleProvider()
+
+    const pending = expect(
+      provider.chatCompletion(request(10_000), controller.signal),
+    ).rejects.toMatchObject({
+      name: LLMCancelledError.name,
+      code: 'cancelled',
+    })
+
+    await waitFor(() => bodyReadStarted)
+    controller.abort()
+    await pending
+  })
+
+  it('keeps the HTTP status error even if the error body never finishes', async () => {
+    vi.stubGlobal('fetch', async () => {
+      return {
+        ok: false,
+        status: 403,
+        body: {
+          cancel: () => new Promise<void>(() => {}),
+        },
+      } as unknown as Response
+    })
+    const provider = new OpenAICompatibleProvider()
+
+    await expect(provider.chatCompletion(request(20))).rejects.toMatchObject({
+      name: LLMAuthError.name,
+      code: 'auth',
+    })
+  })
+
+  it('clears the timeout and external abort listener after completion', async () => {
+    vi.useFakeTimers()
+    try {
+      let requestSignal: AbortSignal | null | undefined
+      vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+        requestSignal = init.signal
+        return jsonResponse(200, completionBody('{"ok":true}'))
+      })
+      const controller = new AbortController()
+      const removeSpy = vi.spyOn(controller.signal, 'removeEventListener')
+      const provider = new OpenAICompatibleProvider()
+
+      await provider.chatCompletion(request(5000), controller.signal)
+
+      expect(vi.getTimerCount()).toBe(0)
+      expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function))
+      expect(requestSignal?.aborted).toBe(false)
+
+      controller.abort()
+      expect(requestSignal?.aborted).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -661,6 +799,28 @@ describe('LIVE session and orchestration', () => {
     expect(session?.error).toContain('认证失败')
     expect(session?.agents[1]?.status).toBe('failed')
     expect(session?.agents[1]?.output).toBeNull()
+    expect(session?.agents.some((agent) => agent.status === 'fallback')).toBe(
+      false,
+    )
+  })
+
+  it('fails the agent and session with a readable error on timeout', async () => {
+    const provider = new ScriptedProvider([new LLMTimeoutError()])
+    const controller = new TaskController({
+      live: { provider, getConfig: () => CONFIG },
+      resolveStepDuration: () => 0,
+    })
+
+    await controller.startLive({
+      topic: '小样本医学图像分割的泛化性改进研究',
+      description: null,
+    })
+    const session = controller.getSession()
+
+    expect(session?.status).toBe('failed')
+    expect(session?.agents[0]?.status).toBe('failed')
+    expect(session?.agents[0]?.error).toContain('请求超时')
+    expect(session?.error).toContain('请求超时')
     expect(session?.agents.some((agent) => agent.status === 'fallback')).toBe(
       false,
     )
