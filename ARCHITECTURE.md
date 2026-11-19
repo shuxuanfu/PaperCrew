@@ -2,7 +2,7 @@
 
 > 多智能体论文拆解与科研推演沙盘：Planner → Researcher → Reviewer → Synthesizer。
 >
-> 文档状态：v3（阶段七，与当前代码同步）
+> 文档状态：v4（阶段 7.1，与当前代码同步）
 > 更新日期：2026-11-19
 > 代码位置：`D:\PaperCrew`（GitHub：https://github.com/shuxuanfu/PaperCrew）
 >
@@ -14,14 +14,14 @@
 
 ### 1.1 定位与硬约束
 
-PaperCrew 是一个**纯前端**的多智能体科研工作台，无后端、无数据库、无账号体系，可静态部署：
+PaperCrew 是**前端应用 + 单一文献代理**的多智能体科研工作台。无数据库、无账号体系，前端可静态部署；文献代理是唯一后端进程，只负责转发 Semantic Scholar 请求：
 
 - **两种模式共用一套引擎**：DEMO 回放本地校验过的 JSON；LIVE 直连 OpenAI-compatible API。两者都产生相同的 `RunSession`，由同一个 Orchestrator、状态机与结果视图消费。
 - **结构优先**：LIVE 的每个 Agent 输出必须是 JSON，并经过 Zod 严格校验；结构不合格只允许一次“仅修结构”的修复请求。
 - **失败即失败**：LIVE 请求失败、解析失败或校验失败都会把 Agent 与 Session 标记为 `failed`，**不会静默回退 DEMO**。
-- **不伪造文献**：LIVE 下模型只生成检索计划，`literature` 必须为空；真实论文由 Semantic Scholar Graph API 提供，Mapper 不补全缺失字段。检索失败或为空时结果页明确显示状态，**不使用模拟文献替代**。
-- **职责分离**：LLM 负责理解课题、拆解问题与制定检索策略；Semantic Scholar 负责论文搜索与元数据；关键词匹配只用于透明展示相关度，不冒充 API 评分。
-- **密钥边界**：LLM Key 仅存于浏览器 `localStorage`，只出现在 `Authorization` 请求头；Semantic Scholar Key 只出现在 `x-api-key` 请求头，且不发送给 LLM Provider。两者都不写日志、不进错误信息、不在 UI 展示完整值。
+- **不伪造文献**：LIVE 下模型只生成检索计划，`literature` 必须为空；真实论文由 Semantic Scholar Graph API 提供（经后端代理），Mapper 不补全缺失字段。检索失败或为空时结果页明确显示状态，**不使用模拟文献替代**。
+- **职责分离**：LLM 负责理解课题、拆解问题与制定检索策略；Semantic Scholar 负责论文搜索与元数据；参考文献元数据由程序拼装，不由模型生成；关键词匹配只用于透明展示相关度，不冒充 API 评分。
+- **密钥边界**：LLM Key 仅存于浏览器 `localStorage`，只出现在 `Authorization` 请求头；Semantic Scholar Key 只存在于代理进程的 `SEMANTIC_SCHOLAR_API_KEY`，由代理放入 `x-api-key`。浏览器永远不接触 S2 Key；Key 不写日志、不进错误信息、不在 UI 展示完整值。
 
 ### 1.2 分层结构
 
@@ -59,10 +59,19 @@ PaperCrew 是一个**纯前端**的多智能体科研工作台，无后端、无
 ┌──────────────────────────▼─────────────────────────────────┐
 │ 外部服务层                                                   │
 │  OpenAICompatibleProvider：POST {BaseURL}/chat/completions  │
-│  SemanticScholarApiProvider：GET /graph/v1/paper/search     │
-│  LiteratureSearchService：查询构建、合并、去重、上限控制      │
+│  SemanticScholarApiProvider：GET {代理}/api/.../search       │
+│  LiteratureSearchService：查询构建、合并、去重、上限与统计    │
 │  semanticScholarMapper：API 字段 → LiteratureClue           │
-└────────────────────────────────────────────────────────────┘
+│  synthesizerCitations：paperId 校验 + 程序生成参考文献        │
+└──────────────────────────┬─────────────────────────────────┘
+                           │ 仅文献（浏览器不接触 S2）
+┌──────────────────────────▼─────────────────────────────────┐
+│ PaperCrew Node 代理（server/，无第三方依赖）                 │
+│  固定上游 URL/fields · 参数白名单 · CORS · 限流 · 超时/取消  │
+│  Key 仅来自 SEMANTIC_SCHOLAR_API_KEY                        │
+└──────────────────────────┬─────────────────────────────────┘
+                           │ HTTPS
+                    api.semanticscholar.org
 
 旁路支撑：
   Zod schemas（DEMO / LIVE / 文献检索）
@@ -85,11 +94,13 @@ PaperCrew 是一个**纯前端**的多智能体科研工作台，无后端、无
 | `PlaybackClock` | `src/engine/playbackClock.ts` | 基于 `setTimeout` 的可暂停计时器；暂停时零等待阻塞，恢复后继续 |
 | `stateMachine` | `src/engine/stateMachine.ts` | Agent / Session 合法状态转换；非法转换直接抛错 |
 | `DemoExecutor` | `src/agents/demoExecutor.ts` | 以模板中的 `durationMs`、进度事件与输出作为 Playbook 与结果 |
-| `LLMExecutor` | `src/agents/llmExecutor.ts` | 组装 Prompt、调用 Provider、解析并校验 JSON、失败时一次结构修复；含跨 Agent DOI 校验 |
+| `LLMExecutor` | `src/agents/llmExecutor.ts` | 组装 Prompt、调用 Provider、解析并校验 JSON、失败时一次结构修复；含跨 Agent DOI 与 `[S2:paperId]` 校验，并追加程序生成的参考文献 |
 | `LiteratureResearcherExecutor` | `src/agents/literatureResearcherExecutor.ts` | 包装 Researcher 执行器：LLM 计划 → Semantic Scholar 检索 → 合并真实文献 → 最终 Schema + 关联问题校验 |
-| `LiteratureSearchService` | `src/services/literature/literatureSearchService.ts` | 构建查询、顺序检索、合并去重、最多 8 篇、失败/部分失败状态 |
-| `SemanticScholarApiProvider` | `src/services/literature/semanticScholarProvider.ts` | Graph API 请求、字段参数、可选 `x-api-key`、HTTP 错误映射、超时/取消生命周期 |
+| `synthesizerCitations` | `src/agents/synthesizerCitations.ts` | 提取 `[S2:paperId]`、对照真实集合、生成参考文献块并插入 `## 4.` 之前 |
+| `LiteratureSearchService` | `src/services/literature/literatureSearchService.ts` | 构建查询、顺序检索、合并去重、最多 8 篇、失败/部分失败状态、三类统计与每查询 `queryStats` |
+| `SemanticScholarApiProvider` | `src/services/literature/semanticScholarProvider.ts` | 调用 PaperCrew 代理、校验 query/limit、HTTP 错误映射、超时/取消生命周期；不发送任何 Key |
 | `semanticScholarMapper` | `src/services/literature/semanticScholarMapper.ts` | 只映射 API 原值，缺失字段保持 null / 空数组，DOI 只取 externalIds.DOI |
+| 文献代理 | `server/src/` | `env` 配置、`semanticScholarClient` 固定上游、`rateLimiter`、路由参数/CORS/取消、HTTP Server |
 | `LLMProvider` | `src/services/llm/llmProvider.ts` | 稳定的模型调用接口，屏蔽具体服务商 |
 | `OpenAICompatibleProvider` | `src/services/llm/openAICompatibleProvider.ts` | HTTP 请求、统一超时/取消生命周期、HTTP 错误映射、响应内容提取 |
 | `ConfigService` | `src/services/config/configService.ts` | 配置读取/保存/删除、完整性检查、连接测试、密钥打码 |
@@ -151,13 +162,14 @@ DEMO 的最终结果与本地 JSON 完全一致；`source = 'demo'`。
 5. Researcher 额外流程（`LiteratureResearcherExecutor`）：
    - LLM 只返回 `retrievalPlan`，`literature` 必须为空；
    - 使用 Planner 的 `searchKeywords` 与 `retrievalPlan.keywordGroups` 构建最多 4 个查询；
-   - 每个查询单独调用 Semantic Scholar（`limit=5`），失败记录 warning 并继续；
+   - 每个查询单独调用 `SemanticScholarApiProvider`（`limit=5`），由代理访问 Semantic Scholar，失败记录 warning 并继续；
    - 按查询轮询合并、`paperId` 去重、最多 8 篇；
-   - 真实文献注入输出，`retrieval` 记录 status / queries / searchedAt / durationMs / totalFound / totalReturned / error / warnings；
+   - 真实文献注入输出，`retrieval` 记录 status / queries / queryStats / searchedAt / durationMs / totalMatched / totalFetched / totalReturned / error / warnings；
    - 最终输出经 `liveResearcherFinalSchema` 校验（全部 `sourceType: 'real'`、id 唯一、关联问题存在）。
 6. 任一 LLM Agent 失败：该 Agent → `failed`，Session → `failed`，错误写入 store，UI 显示失败原因与“重试失败 Agent”；**不切换 DEMO、不保留半成品为成功**。
 7. Semantic Scholar 失败或为空：Researcher 仍可完成（不会伪造论文），`retrieval.status` 为 `failed` / `empty`，结果页展示明确状态与错误；Reviewer / Synthesizer 收到的就是空集合，Prompt 要求其说明证据不足。
-8. 全部完成：Session → `completed`，结果页显示 LIVE MODEL OUTPUT 标识。
+8. Synthesizer 完成前：`LLMExecutor` 校验正文中的 `[S2:paperId]` 必须属于 Researcher 真实集合，未知 ID 触发一次结构修复；通过后由程序把参考文献块插入报告。App 层仍以 `RunSession` 为唯一数据源。
+9. 全部完成：Session → `completed`，结果页显示 LIVE MODEL OUTPUT 标识。
 
 LIVE 与 DEMO 共用 `RunSession`、状态机、Orchestrator、结果组件；差异只在“输出从哪来”。
 
@@ -172,7 +184,7 @@ LIVE 与 DEMO 共用 `RunSession`、状态机、Orchestrator、结果组件；�
 | 1 | Planner | 研究课题 + 可选补充说明 | `plan`：3 个研究问题（q1–q3）、2 组英文关键词（kw1–kw2）、可选备注 | ID 固定；问题与关键词必须非空 |
 | 2 | Researcher | 课题 + Planner 输出 | `research`：检索策略、关键词组合、研究空白、后续方向、`retrievalPlan`；LIVE 下 `literature` 由 Semantic Scholar 注入（最多 8 篇），`retrieval` 记录检索元数据 | LLM 不生成论文；所有真实文献必须通过 API 获取并校验；缺失字段不补全 |
 | 3 | Reviewer | 课题 + Planner + Researcher 输出 | `review`：恰好 3 条意见（类别、严重度、问题、影响、建议、关联问题） | `relatedQuestionIds` 必须引用存在的 q1–q3；需审查真实文献的相关性、证据充分性、缺失方向 |
-| 4 | Synthesizer | 课题 + Planner + Researcher + Reviewer 输出 | `synthesis`：9 章节 Markdown，含 Evidence / Hypothesis / Proposal 与 KaTeX 公式 | 章节齐全；含 `$$` 公式；只能逐字引用真实文献集合，不得引入新论文或集合外 DOI |
+| 4 | Synthesizer | 课题 + Planner + Researcher + Reviewer 输出 | `synthesis`：9 章节 Markdown，含 Evidence / Hypothesis / Proposal 与 KaTeX 公式 | 章节齐全；含 `$$` 公式；只能使用 Researcher 真实集合的 `[S2:paperId]`，不得引入新论文、集合外 paperId 或集合外 DOI；参考文献由程序追加 |
 
 ### 3.2 数据流
 
@@ -182,19 +194,23 @@ topic
         └─> Researcher(LLM plan) ─────────┤
               └─> LiteratureResearcherExecutor
                     ├─ LiteratureSearchService
-                    │    └─ SemanticScholarApiProvider (graph/v1/paper/search)
+                    │    └─ SemanticScholarApiProvider
+                    │         └─ PaperCrew 代理 (server/) ─> Semantic Scholar
                     └─ merge real LiteratureClue[] (≤ 8, deduped)
                           │
                           └─> Researcher output(research + retrieval)
                                 └─> Reviewer ──output(review)──┐
                                       └─> Synthesizer <────────┘
-                                            output(synthesis)
+                                            ├─ [S2:paperId] 校验
+                                            ├─ 程序追加参考文献
+                                            └─ output(synthesis)
 ```
 
 - 上游输出由 `Orchestrator.collectUpstream()` 收集：只包含已结束且确实产出结果的 Agent（`completed` / `fallback`）。
 - `AgentContext` 每次执行时包含：`sessionId`、`topic`、`agentId`、只读的 `session` 快照、`upstream`、`AbortSignal`。
 - LIVE Prompt 通过 `upstreamJson(context, 'planner' | 'researcher' | 'reviewer')` 注入对应 JSON；缺失时注入 `{}`。
-- 跨 Agent 校验在 `LLMExecutor` 中完成：Reviewer 的 `relatedQuestionIds` 必须存在于 Planner 的问题 ID 中；Synthesizer 报告中的 DOI 必须属于 Researcher 的真实文献集合，否则报“不得编造参考文献”。
+- 跨 Agent 校验在 `LLMExecutor` 中完成：Reviewer 的 `relatedQuestionIds` 必须存在于 Planner 的问题 ID 中；Synthesizer 报告中的 DOI 必须属于 Researcher 的真实文献集合，`[S2:paperId]` 必须属于同一集合，否则报“不得编造 S2 引用”。
+- `LLMExecutor.validate()` 在 Synthesizer 通过校验后，用 `appendProgrammaticReferences()` 把程序生成的参考文献插入报告，再写入 `AgentResult`。
 - `LiteratureResearcherExecutor` 额外校验真实文献的 `relatedQuestionIds` 只能引用 Planner 的 q1–q3。
 - DEMO 模式下 `upstream` 同样被收集，但 `DemoExecutor` 直接读取模板输出，不重新生成内容。
 
@@ -309,8 +325,9 @@ topic
 | `RunAgent` | `src/types/session.ts` | 运行中的 Agent：`status`、`output: AgentOutput \| null`、`startedAt?`、`completedAt?`、`error?` |
 | `AgentOutput` | `src/types/research.ts` | 四种输出的联合：`planner` / `researcher` / `reviewer` / `synthesizer` |
 | `LiteratureClue` | `src/schemas/researchSchema.ts` → `types/research.ts` | 文献记录：id、标题、作者、年份、发表渠道、摘要、相关度、`sourceType`、DOI、URL、Open PDF、引用数、关联问题 |
-| `LiteratureRetrieval` | `src/schemas/researchSchema.ts` | 检索元数据：status、queries、searchedAt、durationMs、totalFound、totalReturned、error、warnings |
-| `LiteratureSearchOutcome` | `src/services/literature/semanticScholarTypes.ts` | 检索服务结果：真实文献、状态（completed/empty/failed）、查询、时间、计数、错误、warning |
+| `LiteratureRetrieval` | `src/schemas/researchSchema.ts` | 检索元数据：status、queries、queryStats、searchedAt、durationMs、totalMatched、totalFetched、totalReturned、error、warnings |
+| `LiteratureQueryStat` | `src/schemas/researchSchema.ts` | 单查询统计：query、status（completed/failed）、totalMatched、totalFetched |
+| `LiteratureSearchOutcome` | `src/services/literature/semanticScholarTypes.ts` | 检索服务结果：真实文献、状态（completed/empty/failed）、查询、时间、`totalMatched` / `totalFetched` / `totalReturned`、`queryStats`、错误、warning |
 | `SemanticScholarProvider` | `src/services/literature/semanticScholarTypes.ts` | `search(query, options)` 接口，隔离 HTTP 实现 |
 | `AgentContext` | `src/types/engine.ts` | 执行上下文：`sessionId`、`topic`、`agentId`、`session`、`upstream`、`signal` |
 | `UpstreamAgentResult` | `src/types/engine.ts` | 上游结果：`agentId`、`output`、`source` |
@@ -319,7 +336,7 @@ topic
 | `AgentExecutor` | `src/types/engine.ts` | `execute(context)` 与可选 `getPlaybook(agentId)` |
 | `LLMRequest` | `src/services/llm/llmProvider.ts` | baseURL、apiKey、model、messages、temperature、maxTokens、responseFormat、timeoutMs |
 | `LLMResponse` | `src/services/llm/llmProvider.ts` | `content`、可选 `model`、`finishReason` |
-| `ApiSettings` | `src/types/ui.ts` | baseUrl、apiKey、modelName、temperature、maxTokens、jsonMode、semanticScholarApiKey（可选） |
+| `ApiSettings` | `src/types/ui.ts` | baseUrl、apiKey、modelName、temperature、maxTokens、jsonMode（不含 Semantic Scholar Key） |
 
 ### 5.2 模板与运行态
 
@@ -336,8 +353,8 @@ topic
 | `liveSchemas.ts` | LIVE 单 Agent 输出：Planner ID 固定 q1–q3/kw1–kw2；Researcher 计划阶段 `literature` 必须为空、必须有 `retrievalPlan`；最终阶段最多 8 篇且全部 `sourceType: 'real'`、id 唯一；Reviewer 恰好 3 条；Synthesizer 必须有 9 章节与 `$$` 公式 |
 | `sessionSchema` 校验器 | `validateDemoSession()` 返回结构化问题列表，供 UI 展示 |
 
-校验链路（LLM）：`parseJsonResponse()` → `liveAgentOutputSchemas[agentId].safeParse()` → 跨 Agent 检查。任何一步失败都进入“一次结构修复”流程；修复后仍失败则抛 `AgentExecutionError`。
-校验链路（文献）：API payload → `parseSearchPayload()`（data 数组）→ Mapper（不补全缺失字段）→ `liveResearcherFinalSchema`（数量 / id / real-only）→ 关联问题校验。
+校验链路（LLM）：`parseJsonResponse()` → `liveAgentOutputSchemas[agentId].safeParse()` → 跨 Agent 检查（Reviewer 问题 ID、Synthesizer DOI 与 `[S2:paperId]`）。任何一步失败都进入“一次结构修复”流程；修复后仍失败则抛 `AgentExecutionError`；通过后 Synthesizer 报告由程序追加参考文献。
+校验链路（文献）：代理 payload → `parseSearchPayload()`（data 数组）→ Mapper（不补全缺失字段）→ `liveResearcherFinalSchema`（数量 / id / real-only）→ 关联问题校验。
 
 ---
 
@@ -351,7 +368,7 @@ topic
 - **API Key**：密码输入框，可显示/隐藏；仅保存在 `localStorage`。
 - **Model Name**：原样发送给服务商。
 - **Temperature**：0–2；**Max Tokens**：256–32000；**JSON Mode**：可开关，开启时发送 `response_format: { type: 'json_object' }`。
-- **Semantic Scholar API Key（可选）**：只用于 `api.semanticscholar.org`，放入 `x-api-key`；留空时匿名检索（可能 429）。不会发送给 LLM Provider。
+- **Semantic Scholar 配置不在浏览器**：代理地址由构建环境变量 `VITE_SEMANTIC_SCHOLAR_PROXY_URL` 提供；S2 Key 由代理进程的 `SEMANTIC_SCHOLAR_API_KEY` 提供。设置页不再包含 S2 Key 字段，旧持久化值由 `settingsStore` 在恢复时删除。
 - **Test Connection**：发送最小请求验证 LLM 连通性，独立 20 秒超时；不会调用 Semantic Scholar，也不会启动研究运行。
 - 保存在 `localStorage` 的键由 `ConfigService` 统一管理；删除配置会同时清除内存与本地存储。
 
@@ -427,12 +444,12 @@ Provider 抛错
 
 ### 6.7 密钥存储与安全边界
 
-- LLM API Key 只通过 `ConfigService` 读取，只放入 `Authorization` 头；Semantic Scholar Key 只放入 `x-api-key` 头，不进入 LLM 请求。
-- 两个 Key 都不写 `console`、不进入错误对象、不在 UI 完整展示（仅提供显示/隐藏切换）；错误消息只描述类别与建议。
-- `localStorage` 为明文存储，**不是安全密钥存储**；仅适合个人开发与可信环境演示。公开部署应通过后端代理保护密钥。
-- 连接测试与正式请求使用同一 Provider 与同一套错误映射，不会把 Key 作为查询参数。
+- LLM API Key 只通过 `ConfigService` 读取，只放入 `Authorization` 头。Semantic Scholar Key 只存在于代理进程，由代理放入 `x-api-key`；浏览器请求只包含 `query` / `limit`，不包含 Key。
+- 两个 Key 都不写 `console`、不进入错误对象、不在 UI 完整展示（LLM Key 仅提供显示/隐藏切换）；错误消息只描述类别与建议。代理在转发上游错误时只返回类别与状态，不返回上游响应体，避免泄露。
+- `localStorage` 为明文存储，**不是安全密钥存储**；仅适合个人开发与可信环境演示。公开部署建议把 LLM 也放到服务端转发。
+- 连接测试与正式请求使用同一 Provider 与同一套错误映射，不会把 Key 作为查询参数；代理拒绝 `apiKey` 查询参数。
 
-### 6.8 Semantic Scholar 文献检索
+### 6.8 Semantic Scholar 文献检索（7.1：后端代理）
 
 **分层与职责**
 
@@ -440,18 +457,46 @@ Provider 抛错
 LiteratureResearcherExecutor (AgentExecutor 装饰器)
   └─ LiteratureSearchService
        ├─ buildQueries：Planner 2 组关键词优先 + retrievalPlan.keywordGroups 补充
-       ├─ SemanticScholarApiProvider.search(query, { signal, apiKey, limit, timeoutMs })
-       └─ mergeResults：按查询轮询合并 → paperId 去重 → 最多 8 篇
+       ├─ SemanticScholarApiProvider.search(query, { signal, limit, timeoutMs })
+       │    └─ GET {VITE_SEMANTIC_SCHOLAR_PROXY_URL}/api/semantic-scholar/search?query&limit
+       └─ mergeResults：按查询轮询合并 → paperId 去重 → 最多 8 篇 → 统计
+
+server/ 代理
+  └─ GET /api/semantic-scholar/search
+       ├─ 参数白名单 + 长度/范围校验 + 方法/请求体限制
+       ├─ CORS 精确来源 + 限流 → semanticScholarClient
+       └─ GET https://api.semanticscholar.org/graph/v1/paper/search（固定 fields）
 ```
 
 LLM 只生成 `retrievalPlan`，不得生成文献；真实文献由服务层注入。这样既保持 `AgentExecutor` / Orchestrator / DEMO-LIVE 共用结构不变，也把“搜索”和“生成”职责分开。
 
-**请求**
+**前端请求**
 
-- `GET https://api.semanticscholar.org/graph/v1/paper/search`
-- 参数：`query`、`limit=5`、`fields=paperId,title,authors,year,venue,abstract,url,externalIds,publicationTypes,openAccessPdf,citationCount,referenceCount,fieldsOfStudy`
-- Header：`Accept: application/json`；仅配置 Key 时添加 `x-api-key`
-- 每个查询独立请求；最多 4 个查询；超时 20 秒；复用 Session `AbortSignal`
+- 只请求 `GET {代理}/api/semantic-scholar/search`，参数仅 `query` 与 `limit`；`limit` 固定为 5（Provider 允许 1–10，非法值直接抛 `LiteratureConfigError`）
+- Header 仅 `Accept: application/json`；不发送 `x-api-key`、不发送 Authorization、不发送任何 S2 Key
+- 未配置代理地址、非 http(s)、非法 URL → `LiteratureConfigError`，提示设置 `VITE_SEMANTIC_SCHOLAR_PROXY_URL`
+- 每个查询独立请求；最多 4 个查询；超时 20 秒；复用 Session `AbortSignal`；`fetch` 与 `response.json()` 共用一个 `AbortController` 生命周期
+
+**代理接口与安全边界**
+
+- 接口：`GET /api/semantic-scholar/search?query=<2-300 字符>&limit=<1-10>`；`limit` 默认 5
+- 拒绝其他参数（包括 `url`、`fields`、`apiKey`）、非 GET 方法、带请求体的 GET；上游 URL 与 fields **硬编码**，不存在任意 URL 转发
+- Key：只读取 `SEMANTIC_SCHOLAR_API_KEY`，仅在有值时添加 `x-api-key`；不返回前端、不写日志、不进入错误消息
+- CORS：`CORS_ALLOWED_ORIGINS` 精确来源，拒绝 `*` 和带路径的值；开发环境默认 `http://localhost:5173` / `http://127.0.0.1:5173`；生产未配置则为空（拒绝浏览器来源）
+- 限流：单实例内存、按 IP、默认 60 次 / 60 秒；超限返回 `429 rate_limited` 与 `Retry-After`
+- 超时：上游默认 15 秒，返回 `504 upstream_timeout`；客户端断开（`req.aborted` / `res.close`）会 abort 上游
+- 状态映射：400 `upstream_request`、401/403 `upstream_auth`、404 `upstream_not_found`、429 `upstream_rate_limit`、502 `upstream_network`、5xx `upstream_server`、499 `client_cancelled`（不返回响应体）、500 `internal_error`
+
+**统计口径**
+
+| 字段 | 定义 | 注意 |
+| --- | --- | --- |
+| `totalMatched` | 各查询上游 `total` 之和 | 上游 total 可能包含跨查询重复，不等于实际返回数 |
+| `totalFetched` | 各查询 `data` 实际取回条数之和 | 去重前；成功查询的 `papers.length` 之和 |
+| `totalReturned` | 合并去重并截断到 8 篇后的数量 | 最终注入 Researcher 的文献数 |
+| `queryStats[]` | 每查询 `status` / `totalMatched` / `totalFetched` | 失败查询 `totalMatched=null`、`totalFetched=0` |
+
+失败 / 空结果路径同样返回 `queryStats` 与三项计数（为 0 或已成功查询的累计值），不伪造论文。
 
 **字段映射（不造数据）**
 
@@ -469,19 +514,27 @@ LLM 只生成 `retrievalPlan`，不得生成文献；真实文献由服务层注
 | `sourceType` | 固定 `real` | — |
 | `relatedQuestionIds` | Mapper 不推测，默认 `[]` | `[]` |
 
+**引用与参考文献**
+
+- 正文引用格式：`[S2:<paperId>]`；`extractS2PaperIds()` 去重提取，`citationIssues()` 对照 Researcher 集合
+- 未知 paperId：作为校验失败进入 `LLMExecutor` 的“一次结构修复”；修复后仍未知则 Agent / Session 失败
+- DOI 校验保留：报告中出现的 DOI 必须属于真实集合
+- 成功后 `appendProgrammaticReferences()` 生成参考文献块并插入 `## 4. 研究假设` 之前（找不到则追加到末尾）；标题固定为“参考文献（由程序根据 Semantic Scholar 数据生成）”；作者 / 年份 / 渠道缺失写“暂无数据”，无 DOI 写“DOI：暂无数据”，无链接写“来源链接：暂无数据”；模型不参与该块生成
+
 **状态与错误**
 
 - `retrieval.status`：`idle | searching | completed | empty | failed`（运行结果只落 completed / empty / failed；searching 在 LIVE 运行中由结果页提示）。
 - 单查询失败：记录 warning，继续其他查询；最终 `error = 部分查询失败：…`。
 - 全部失败：`status = failed`，`literature = []`，不生成模拟论文。
-- HTTP / 传输错误：400、401/403、404、429、5xx、网络/CORS、非法 JSON、超时、取消分别映射为 `Literature*Error`，消息可读且不含 Key。
-- 取消 Session 会 abort 当前 S2 请求；Researcher 走取消流程（`skipped`），不会把取消误报为检索失败。
+- HTTP / 传输错误：前端把代理的 400、401/403、404/405、429、502、504、5xx、网络、非法 JSON、超时、取消分别映射为 `Literature*Error`，消息可读且不含 Key。
+- 取消 Session 会 abort 当前前端请求；代理检测到断开后 abort 上游；Researcher 走取消流程（`skipped`），不会把取消误报为检索失败。
 
-**CORS 实测与部署边界**
+**部署边界**
 
-- `OPTIONS` 预检曾返回 204，并声明 `Access-Control-Allow-Origin: *`、允许 `GET` 与 `x-api-key`。
-- 本次真实浏览器 GET 返回的却是**不带 ACAO 的错误响应**（命令行 GET 也出现连接重置/超时），浏览器因此报 CORS 拦截；这是当前网络 / 限流状态下的实际限制。
-- 因此代码保留了可替换的 `SemanticScholarProvider` 接口和完整错误处理；若部署环境仍被 CORS 阻塞，需要后端代理转发（本阶段按约束未添加后端）。
+- 仓库只包含可部署实现，**没有线上实例**；未部署代理时生产环境无法进行真实文献检索，错误会明确提示代理未配置 / 不可达。
+- 代理必须运行在支持 Node.js ≥ 20.19 的环境；不能部署为纯静态站点。
+- 多实例部署时内存限流不共享，需要共享限流存储或网关限流。
+- 线上验证需在真实部署后单独执行；Mock 测试不代表真实 API 成功。
 
 ---
 
@@ -497,22 +550,26 @@ LLM 只生成 `retrievalPlan`，不得生成文献；真实文献由服务层注
 - 错误分级与中文提示：认证、地址、模型/参数、限流、5xx、网络、超时、取消、解析、校验。
 - API Settings：完整性检查、连接测试、显示/隐藏密钥、打码展示、删除配置。
 - 失败语义：LIVE 失败不回退 DEMO、不伪造文献；Semantic Scholar 失败/为空时明确展示失败/空状态，Researcher 不生成替代论文。
-- Semantic Scholar 真实文献检索：Provider、Mapper、SearchService、Researcher 装饰器、最终 Schema 校验、Reviewer / Synthesizer 真实文献约束、`x-api-key` 可选配置。
-- 文献 UI：检索状态 / 时间 / 查询 / 计数 / warning、失败与空状态、REAL PAPER 与 SIMULATED 区分、缺失字段“暂无数据”、DOI / S2 / Open PDF 链接。
+- Semantic Scholar 真实文献检索：Provider、Mapper、SearchService、Researcher 装饰器、最终 Schema 校验、Reviewer / Synthesizer 真实文献约束。
+- **节点 7.1 代理链路**：浏览器 → PaperCrew Node 代理 → Semantic Scholar；固定上游与 fields、参数白名单、CORS 白名单、单实例限流、上游超时与客户端取消传播；S2 Key 只在服务端。
+- **节点 7.1 Key 清理**：删除 `ApiSettings.semanticScholarApiKey`、设置页输入、ConfigService 写入与 Provider 传参；`settingsStore` 在 rehydrate 时删除旧 `papercrew.settings.v1.semanticScholarApiKey`。
+- **节点 7.1 统计口径**：`totalMatched` / `totalFetched` / `totalReturned` + `queryStats`，覆盖成功、部分失败、全部失败、空结果。
+- **节点 7.1 引用加固**：`[S2:paperId]` 确定性校验、一次结构修复、DOI 校验保留；程序生成参考文献并插入报告。
+- 文献 UI：检索状态 / 时间 / 三类计数 / 查询 / warning、失败与空状态、REAL PAPER 与 SIMULATED 区分、缺失字段“暂无数据”、DOI / S2 / Open PDF 链接。
 - 响应式三栏工作台 + 移动端视图切换；Markdown + GFM 表格 + KaTeX 报告渲染。
-- Vitest 自动化测试（Mock Provider / Mock fetch，不消耗真实 API 额度）、TypeScript 严格类型检查、生产构建。
+- Vitest + `node:test` 自动化测试（Mock Provider / Mock fetch，不消耗真实 API 额度）、TypeScript 严格类型检查、生产构建。
 
 ### 7.2 未实现（明确不在当前版本）
 
 - **多源文献与全文**：只接入 Semantic Scholar Graph API；未接入 Crossref、arXiv、PDF 下载/解析、RAG、引用管理。
-- **Semantic Scholar 后端代理**：当前为浏览器直连；真实浏览器 GET 可出现 CORS / 限流问题，生产部署需后端转发（本阶段未添加）。
+- **线上部署与运维**：代理实现存在但**没有线上实例**；真实文献检索需要先部署后端代理。多实例限流、缓存、指标与告警未实现。
 - **流式输出**：当前为一次性请求完成后解析，不做 SSE/流式增量渲染。
 - **会话持久化 / 历史记录 / 导出**：运行态只在内存；刷新即丢失；无运行历史列表、无导出。
-- **多用户与账号体系**：无服务端、无账号、无数据库；两个 API Key 均在前端明文使用。
+- **多用户与账号体系**：无账号、无数据库；LLM Key 仍在前端明文使用。
 - **并行模型 / 多轮辩论 / 动态 Agent 编排**：固定四个 Agent 串行；未实现并行调用、投票或递归规划。
 - **自动重试策略**：网络/超时/5xx 不自动重试；只有 JSON 结构修复的一次机会；429 不循环重试。
 - **路由与深链**：当前为单页无路由，以兼容静态托管。
-- **E2E / 浏览器自动化测试、CI 流水线**：当前只包含 Vitest 单元/集成测试。
+- **E2E / 浏览器自动化测试、CI 流水线**：当前只包含 Vitest 与 `node:test` 单元/集成测试。
 
 `src/features/`、`src/lib/`、`src/domain/session/`、`src/domain/pipeline/`、`src/domain/agent/prompts/`、`src/services/runner/`、`src/services/storage/`、`src/data/demo/cases/` 目前是预留目录（仅 `.gitkeep`），没有运行时代码。
 
@@ -524,11 +581,24 @@ LLM 只生成 `retrievalPlan`，不得生成文献；真实文献由服务层注
 PaperCrew/
 ├─ ARCHITECTURE.md              # 本文（单一事实源）
 ├─ README.md
+├─ .env.example                 # 前端：VITE_SEMANTIC_SCHOLAR_PROXY_URL
 ├─ index.html
 ├─ package.json
 ├─ vite.config.ts               # @ 别名、base: './'
 ├─ vitest.config.ts             # node 环境、tests/**/*.test.ts
 ├─ tsconfig.json / tsconfig.app.json / tsconfig.node.json
+├─ server/                      # Node 文献代理（无第三方依赖）
+│  ├─ package.json              # start / dev / test / check
+│  ├─ .env.example
+│  ├─ README.md
+│  ├─ src/
+│  │  ├─ index.js               # createProxyServer / listen / 优雅退出
+│  │  ├─ config/env.js          # PORT / Key / CORS / 超时 / 限流
+│  │  ├─ routes/semanticScholar.js
+│  │  └─ services/
+│  │     ├─ semanticScholarClient.js
+│  │     └─ rateLimiter.js
+│  └─ tests/proxy.test.js       # 9 项代理测试（Mock fetch）
 ├─ public/
 │  └─ data/
 │     ├─ demo-medical.json      # 案例 A：小样本医学图像分割
@@ -536,9 +606,10 @@ PaperCrew/
 ├─ tests/
 │  ├─ engine/
 │  │  ├─ engine.test.ts         # 状态机、编排、暂停/恢复、取消、重试、隔离（15 项）
-│  │  └─ live.test.ts           # Provider、生命周期、Prompt、LIVE 编排、文献工作流（27 项）
+│  │  ├─ live.test.ts           # Provider、生命周期、Prompt、LIVE 编排、文献工作流（27 项）
+│  │  └─ synthesizerCitations.test.ts  # paperId 校验、程序参考文献、DOI 边界（7 项）
 │  └─ literature/
-│     └─ literature.test.ts     # Semantic Scholar Provider / Mapper / SearchService（21 项）
+│     └─ literature.test.ts     # 代理 Provider / Mapper / SearchService / 统计（23 项）
 └─ src/
    ├─ main.tsx
    ├─ App.tsx                   # 外壳：Header / 三栏 / 设置弹窗 / 移动端切换
@@ -576,7 +647,8 @@ PaperCrew/
    ├─ agents/
    │  ├─ demoExecutor.ts
    │  ├─ llmExecutor.ts
-   │  └─ literatureResearcherExecutor.ts
+   │  ├─ literatureResearcherExecutor.ts
+   │  └─ synthesizerCitations.ts
    ├─ prompts/
    │  ├─ index.ts               # LIVE_PROMPTS 注册表
    │  ├─ promptUtils.ts         # topicBlock / upstreamJson
@@ -624,11 +696,17 @@ PaperCrew/
 | 命令 | 内容 |
 | --- | --- |
 | `npm run typecheck` | `tsc -b` 严格类型检查 |
-| `npm test` | Vitest：15 项引擎/状态机/DEMO + 27 项 LIVE Provider/编排/文献工作流 + 21 项 Semantic Scholar Provider/Mapper/SearchService，共 63 项 |
+| `npm test` | Vitest：15 项引擎/状态机/DEMO + 27 项 LIVE Provider/编排/文献工作流 + 7 项引用/参考文献 + 23 项代理 Provider/Mapper/SearchService/统计，共 72 项 |
 | `npm run build` | 类型检查 + Vite 生产构建（输出 `dist/`） |
+| `cd server && npm test` | `node:test`：9 项代理测试（Mock fetch） |
+| `cd server && npm run check` | 代理源码 `node --check` |
 
 所有测试使用 Mock Provider / Mock `fetch`，不访问真实 API、不消耗额度。覆盖范围包括：正常 LLM 请求；响应体读取阶段超时；响应体读取阶段取消（且不被误报为超时）；401/403/404/429/500/503 映射；错误体阻塞时仍返回原 HTTP 错误；超时定时器与外部 abort 监听器清理；LIVE 超时导致 Agent 与 Session 失败且不产生 fallback。
 
-Semantic Scholar 相关覆盖：请求 URL / query / limit / fields；有 Key 与匿名请求；400/401/403/404/429/5xx/网络/非法 JSON/超时/取消；Mapper 正常与缺失字段（abstract、venue、DOI、authors、year）不补全；paperId / title 缺失时丢弃；两组关键词参与检索；合并去重；最多 8 篇且跨查询轮询；空结果；全部失败返回 `failed` 且不生成模拟文献；部分失败保留其他结果并写 warning；Researcher 注入真实文献并被 Reviewer / Synthesizer 读取；S2 失败不伪造；Session 取消会中止检索；DEMO 15 项测试保持通过。
+代理 Provider / 检索覆盖：代理 URL、query / limit、无 Key；无效 limit；代理未配置；401/403、400、404/405、429、504、5xx、网络、非法 JSON、超时、取消；Mapper 正常与缺失字段（abstract、venue、DOI、authors、year）不补全；paperId / title 缺失时丢弃；两组关键词参与检索；合并去重；最多 8 篇且跨查询轮询；空结果；全部失败返回 `failed` 且不生成模拟文献；部分失败保留其他结果并写 warning；API 匹配数 / 实际返回数 / 去重保留数三者不同；每查询统计；Researcher 注入真实文献并被 Reviewer / Synthesizer 读取；S2 失败不伪造；Session 取消会中止检索；DEMO 15 项测试保持通过。
 
-浏览器实测（2026-11-19）：两套 DEMO 案例均完成并正确渲染；API Settings 显示可选 Semantic Scholar Key 字段；LIVE 无配置时正确阻止启动并列出缺失字段。真实 LIVE 运行受 LLM 凭据和当前 Semantic Scholar 网络/CORS 状态限制，未能在浏览器中完成端到端真实检索（详见 6.8）。
+引用与参考文献覆盖：已知 paperId 通过；未知 paperId 一次修复后仍失败；空文献集合禁止 S2 引用；无 DOI / 无链接写“暂无数据”；稀疏元数据不补作者 / DOI；编造 DOI 被拒绝；参考文献块插入 `## 4.` 之前。
+
+代理后端覆盖：正常转发（固定上游 URL、fields、服务端 Key）；缺失 query、空 query、超长 query；非法 limit；拒绝 `url` / `apiKey` 等额外参数；上游 400 / 401 / 403 / 429 / 5xx 状态与错误码；网络失败 502；上游超时 504；客户端断开 abort 上游；CORS 精确来源与拒绝 `*`；方法限制 405；拒绝 GET 请求体；限流 429 + `Retry-After`；Key 不写日志、不出现在响应；不允许任意 URL 转发。
+
+浏览器实测（2026-11-19，本地真实代理，非 Mock）：DEMO 案例完整运行 4/4 Agent 并正确渲染 9 章节报告；API Settings 不再包含 Semantic Scholar Key 输入，人工写入旧 `semanticScholarApiKey` 后刷新会被清理；在页面上下文直接 `fetch` 本地代理，跨域成功并返回 HTTP 200 与真实论文数据；随后通过页面动态加载的 `SemanticScholarApiProvider` 再次请求，命中上游匿名 429 并被正确映射为 `LiteratureRateLimitError`。LIVE 端到端未执行：当前环境没有可用的 LLM 凭据。仓库没有线上部署，Mock 测试不代表生产 API 成功。

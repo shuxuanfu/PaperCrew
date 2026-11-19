@@ -116,7 +116,8 @@ function RetrievalMeta({ retrieval }: { retrieval: LiteratureRetrieval }) {
           {formatSearchedAt(retrieval.searchedAt)}
         </span>
         <span className="text-[9.5px] text-muted">
-          API returned {retrieval.totalFound} · kept {retrieval.totalReturned}
+          API matched {retrieval.totalMatched} · fetched{' '}
+          {retrieval.totalFetched} · kept {retrieval.totalReturned}
         </span>
         <span className="text-[9.5px] text-muted">
           {retrieval.durationMs} ms
@@ -135,6 +136,10 @@ function RetrievalMeta({ retrieval }: { retrieval: LiteratureRetrieval }) {
           ))}
         </div>
       ) : null}
+
+      <p className="mt-2 text-[9px] leading-[1.5] text-muted/80">
+        API matched 是各查询 total 之和，可能包含跨查询重复；fetched 是实际返回条数之和；kept 是去重并限制为 8 篇后的保留数。
+      </p>
 
       {retrieval.warnings && retrieval.warnings.length > 0 ? (
         <div className="mt-2.5 space-y-1">

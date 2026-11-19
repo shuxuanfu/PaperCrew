@@ -288,9 +288,18 @@ const COMPLETED_OUTCOME: LiteratureSearchOutcome = {
   literature: [REAL_PAPER],
   status: 'completed',
   queries: ['domain generalization medical image segmentation'],
+  queryStats: [
+    {
+      query: 'domain generalization medical image segmentation',
+      status: 'completed',
+      totalMatched: 1,
+      totalFetched: 1,
+    },
+  ],
   searchedAt: '2026-01-01T00:00:00.000Z',
   durationMs: 12,
-  totalFound: 1,
+  totalMatched: 1,
+  totalFetched: 1,
   error: null,
   warnings: [],
 }
@@ -953,6 +962,8 @@ describe('LIVE literature retrieval workflow', () => {
     }
     expect(researcher.output.literature).toEqual([REAL_PAPER])
     expect(researcher.output.retrieval?.status).toBe('completed')
+    expect(researcher.output.retrieval?.totalMatched).toBe(1)
+    expect(researcher.output.retrieval?.totalFetched).toBe(1)
     expect(researcher.output.retrieval?.totalReturned).toBe(1)
     expect(researcher.output.summary).toContain('Semantic Scholar')
 
@@ -972,7 +983,16 @@ describe('LIVE literature retrieval workflow', () => {
       ...COMPLETED_OUTCOME,
       literature: [],
       status: 'failed',
-      totalFound: 0,
+      totalMatched: 0,
+      totalFetched: 0,
+      queryStats: [
+        {
+          query: 'domain generalization medical image segmentation',
+          status: 'failed',
+          totalMatched: null,
+          totalFetched: 0,
+        },
+      ],
       error: 'Semantic Scholar 请求受限（429）：请稍后重试。',
       warnings: ['Semantic Scholar 请求受限（429）：请稍后重试。'],
     })
@@ -1014,7 +1034,8 @@ describe('LIVE literature retrieval workflow', () => {
       ...COMPLETED_OUTCOME,
       literature: [],
       status: 'empty',
-      totalFound: 0,
+      totalMatched: 0,
+      totalFetched: 0,
       error: null,
       warnings: [],
     })

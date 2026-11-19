@@ -31,7 +31,7 @@ function buildSummary(
   if (outcome.status === 'empty') {
     return `${baseSummary} 已查询 Semantic Scholar，但未检索到可用的真实论文；未生成虚构文献。`
   }
-  return `${baseSummary} 已通过 Semantic Scholar 检索到 ${outcome.literature.length} 篇真实论文（${outcome.queries.length} 个查询）。`
+  return `${baseSummary} 已通过 Semantic Scholar 检索到 ${outcome.literature.length} 篇真实论文（${outcome.queries.length} 个查询；API 匹配 ${outcome.totalMatched} 条，实际返回 ${outcome.totalFetched} 条，去重后保留 ${outcome.literature.length} 条）。`
 }
 
 function validateRelatedQuestions(
@@ -131,9 +131,11 @@ export class LiteratureResearcherExecutor implements AgentExecutor {
       retrieval: {
         status: outcome.status,
         queries: outcome.queries,
+        queryStats: outcome.queryStats,
         searchedAt: outcome.searchedAt,
         durationMs: outcome.durationMs,
-        totalFound: outcome.totalFound,
+        totalMatched: outcome.totalMatched,
+        totalFetched: outcome.totalFetched,
         totalReturned: outcome.literature.length,
         error: outcome.error,
         warnings: outcome.warnings,

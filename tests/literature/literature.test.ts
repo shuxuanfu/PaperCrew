@@ -7,14 +7,14 @@ import {
 import { LiteratureSearchService } from '@/services/literature/literatureSearchService'
 import { mapSemanticScholarPaper } from '@/services/literature/semanticScholarMapper'
 import {
-  SEMANTIC_SCHOLAR_SEARCH_URL,
+  SEMANTIC_SCHOLAR_PROXY_PATH,
   SemanticScholarApiProvider,
 } from '@/services/literature/semanticScholarProvider'
-import {
-  SEMANTIC_SCHOLAR_FIELDS,
-  type SemanticScholarPaper,
-  type SemanticScholarProvider,
-  type SemanticScholarSearchOptions,
+import type {
+  SemanticScholarPaper,
+  SemanticScholarProvider,
+  SemanticScholarSearchOptions,
+  SemanticScholarSearchResult,
 } from '@/services/literature/semanticScholarTypes'
 import type { RetrievalPlan, SearchKeywordGroup } from '@/types/research'
 
@@ -60,6 +60,12 @@ const plannerKeywords: SearchKeywordGroup[] = [
   },
 ]
 
+const PROXY_URL = 'https://proxy.example.com'
+
+function proxyProvider(): SemanticScholarApiProvider {
+  return new SemanticScholarApiProvider({ proxyUrl: PROXY_URL })
+}
+
 const retrievalPlan: RetrievalPlan = {
   searchStrategy:
     '先检索泛化性与小样本分割，再补充跨中心评测与领域自适应方法。',
@@ -91,16 +97,21 @@ function paper(
   }
 }
 
+type ProviderResponse =
+  | SemanticScholarPaper[]
+  | { papers: SemanticScholarPaper[]; total: number }
+  | Error
+
 class RecordingProvider implements SemanticScholarProvider {
   readonly queries: string[] = []
   readonly options: SemanticScholarSearchOptions[] = []
   private readonly handler: (
     query: string,
     index: number,
-  ) => SemanticScholarPaper[] | Error
+  ) => ProviderResponse
 
   constructor(
-    handler: (query: string, index: number) => SemanticScholarPaper[] | Error,
+    handler: (query: string, index: number) => ProviderResponse,
   ) {
     this.handler = handler
   }
@@ -108,7 +119,7 @@ class RecordingProvider implements SemanticScholarProvider {
   async search(
     query: string,
     options: SemanticScholarSearchOptions = {},
-  ): Promise<{ papers: SemanticScholarPaper[]; total: number }> {
+  ): Promise<SemanticScholarSearchResult> {
     const index = this.queries.length
     this.queries.push(query)
     this.options.push(options)
@@ -116,7 +127,10 @@ class RecordingProvider implements SemanticScholarProvider {
     if (result instanceof Error) {
       throw result
     }
-    return { papers: result, total: result.length }
+    if (Array.isArray(result)) {
+      return { papers: result, total: result.length }
+    }
+    return result
   }
 }
 
@@ -125,14 +139,14 @@ afterEach(() => {
 })
 
 describe('Semantic Scholar provider', () => {
-  it('requests the graph search endpoint with query, limit and all fields anonymously', async () => {
+  it('requests the PaperCrew proxy with query and limit only', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = []
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
       calls.push({ url, init })
       return jsonResponse(200, { total: 1, data: [paper('p1', 'Paper One')] })
     })
 
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
     const result = await provider.search('domain generalization', { limit: 5 })
 
     expect(result.papers).toHaveLength(1)
@@ -140,47 +154,63 @@ describe('Semantic Scholar provider', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0].init.method).toBe('GET')
     const url = new URL(calls[0].url)
-    expect(`${url.origin}${url.pathname}`).toBe(SEMANTIC_SCHOLAR_SEARCH_URL)
+    expect(`${url.origin}${url.pathname}`).toBe(
+      `${PROXY_URL}${SEMANTIC_SCHOLAR_PROXY_PATH}`,
+    )
     expect(url.searchParams.get('query')).toBe('domain generalization')
     expect(url.searchParams.get('limit')).toBe('5')
-    expect(url.searchParams.get('fields')).toBe(
-      SEMANTIC_SCHOLAR_FIELDS.join(','),
-    )
+    expect(url.searchParams.get('fields')).toBeNull()
+    expect(url.searchParams.get('apiKey')).toBeNull()
     const headers = calls[0].init.headers as Record<string, string>
     expect(headers.Accept).toBe('application/json')
     expect(headers['x-api-key']).toBeUndefined()
   })
 
-  it('sends x-api-key only when a key is configured', async () => {
+  it('never sends a browser-side API key and rejects invalid limits', async () => {
     const headersSeen: Array<Record<string, string>> = []
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
       headersSeen.push(init.headers as Record<string, string>)
       return jsonResponse(200, { total: 0, data: [] })
     })
 
-    const provider = new SemanticScholarApiProvider()
-    await provider.search('query', { apiKey: '  s2-secret  ' })
-    await provider.search('query', { apiKey: '   ' })
+    const provider = proxyProvider()
+    await provider.search('query')
+    await provider.search('query', { limit: 10 })
 
-    expect(headersSeen[0]['x-api-key']).toBe('s2-secret')
+    expect(headersSeen[0]['x-api-key']).toBeUndefined()
     expect(headersSeen[1]['x-api-key']).toBeUndefined()
+    await expect(provider.search('query', { limit: 11 })).rejects.toMatchObject(
+      { code: 'config' },
+    )
   })
 
-  it('maps 401 and 403 to an auth error without leaking the key', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse(401, { error: 'nope' }))
-    const provider = new SemanticScholarApiProvider()
+  it('requires a configured proxy URL', async () => {
+    const provider = new SemanticScholarApiProvider({ proxyUrl: '' })
+    await expect(provider.search('query')).rejects.toMatchObject({
+      code: 'config',
+    })
 
-    const error = await provider
-      .search('query', { apiKey: 's2-secret' })
-      .catch((caught: unknown) => caught)
+    const invalid = new SemanticScholarApiProvider({ proxyUrl: 'ftp://proxy' })
+    await expect(invalid.search('query')).rejects.toMatchObject({
+      code: 'config',
+    })
+  })
+
+  it('maps 401 and 403 to an auth error with backend-key guidance', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse(401, { error: 'nope' }))
+    const provider = proxyProvider()
+
+    const error = await provider.search('query').catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'auth' })
-    expect(String((error as Error).message)).not.toContain('s2-secret')
+    expect(String((error as Error).message)).toContain(
+      'SEMANTIC_SCHOLAR_API_KEY',
+    )
   })
 
   it('maps 429 to a rate limit error', async () => {
     vi.stubGlobal('fetch', async () => jsonResponse(429, { error: 'slow' }))
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
 
     await expect(provider.search('query')).rejects.toMatchObject({
       code: 'rate_limit',
@@ -188,30 +218,31 @@ describe('Semantic Scholar provider', () => {
   })
 
   it('maps 400, 403 and 404 to request or auth errors', async () => {
-    const provider = new SemanticScholarApiProvider()
-
     vi.stubGlobal('fetch', async () => jsonResponse(400, { error: 'bad' }))
-    await expect(provider.search('query')).rejects.toMatchObject({
+    await expect(proxyProvider().search('query')).rejects.toMatchObject({
       code: 'request',
     })
 
     vi.stubGlobal('fetch', async () => jsonResponse(403, { error: 'forbidden' }))
-    await expect(provider.search('query')).rejects.toMatchObject({
+    await expect(proxyProvider().search('query')).rejects.toMatchObject({
       code: 'auth',
     })
 
     vi.stubGlobal('fetch', async () => jsonResponse(404, { error: 'missing' }))
-    await expect(provider.search('query')).rejects.toMatchObject({
+    await expect(proxyProvider().search('query')).rejects.toMatchObject({
       code: 'request',
     })
   })
 
-  it('maps 5xx to a server error', async () => {
+  it('maps proxy 5xx to a server error and 504 to a timeout', async () => {
     vi.stubGlobal('fetch', async () => jsonResponse(503, { error: 'down' }))
-    const provider = new SemanticScholarApiProvider()
-
-    await expect(provider.search('query')).rejects.toMatchObject({
+    await expect(proxyProvider().search('query')).rejects.toMatchObject({
       code: 'server',
+    })
+
+    vi.stubGlobal('fetch', async () => jsonResponse(504, { error: 'timeout' }))
+    await expect(proxyProvider().search('query')).rejects.toMatchObject({
+      code: 'timeout',
     })
   })
 
@@ -219,7 +250,7 @@ describe('Semantic Scholar provider', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('Failed to fetch')
     })
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
 
     await expect(provider.search('query')).rejects.toMatchObject({
       code: 'network',
@@ -228,7 +259,7 @@ describe('Semantic Scholar provider', () => {
 
   it('rejects malformed JSON and payloads without a data array', async () => {
     vi.stubGlobal('fetch', async () => new Response('not json', { status: 200 }))
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
     await expect(provider.search('query')).rejects.toMatchObject({
       code: 'response',
     })
@@ -241,7 +272,7 @@ describe('Semantic Scholar provider', () => {
 
   it('times out a hanging response body', async () => {
     vi.stubGlobal('fetch', hangingBodyFetch())
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
 
     await expect(
       provider.search('query', { timeoutMs: 15 }),
@@ -250,7 +281,7 @@ describe('Semantic Scholar provider', () => {
 
   it('cancels an in-flight request through the external AbortSignal', async () => {
     vi.stubGlobal('fetch', hangingBodyFetch())
-    const provider = new SemanticScholarApiProvider()
+    const provider = proxyProvider()
     const controller = new AbortController()
 
     const pending = provider.search('query', { signal: controller.signal })
@@ -365,7 +396,6 @@ describe('LiteratureSearchService', () => {
     ])
     const service = new LiteratureSearchService({
       provider,
-      getApiKey: () => 's2-key',
       limitPerQuery: 5,
       now: () => new Date('2026-01-01T00:00:00.000Z'),
     })
@@ -384,12 +414,19 @@ describe('LiteratureSearchService', () => {
     ])
     expect(provider.queries).toEqual(outcome.queries)
     expect(provider.options.every((options) => options.limit === 5)).toBe(true)
-    expect(provider.options.every((options) => options.apiKey === 's2-key')).toBe(
-      true,
-    )
+    expect(
+      provider.options.every((options) => 'apiKey' in options === false),
+    ).toBe(true)
     expect(outcome.literature).toHaveLength(4)
     expect(outcome.searchedAt).toBe('2026-01-01T00:00:00.000Z')
-    expect(outcome.totalFound).toBe(4)
+    expect(outcome.totalMatched).toBe(4)
+    expect(outcome.totalFetched).toBe(4)
+    expect(outcome.queryStats).toHaveLength(4)
+    expect(
+      outcome.queryStats.every(
+        (stat) => stat.status === 'completed' && stat.totalFetched === 1,
+      ),
+    ).toBe(true)
   })
 
   it('deduplicates papers returned by multiple queries', async () => {
@@ -408,6 +445,8 @@ describe('LiteratureSearchService', () => {
     expect(ids.filter((id) => id === 'shared')).toHaveLength(1)
     expect(new Set(ids).size).toBe(ids.length)
     expect(outcome.literature).toHaveLength(5)
+    expect(outcome.totalMatched).toBe(8)
+    expect(outcome.totalFetched).toBe(8)
   })
 
   it('caps the merged result at eight papers while keeping queries balanced', async () => {
@@ -434,7 +473,9 @@ describe('LiteratureSearchService', () => {
       'p2-1',
       'p3-1',
     ])
-    expect(outcome.totalFound).toBe(20)
+    expect(outcome.totalMatched).toBe(20)
+    expect(outcome.totalFetched).toBe(20)
+    expect(outcome.literature).toHaveLength(8)
   })
 
   it('returns an empty outcome without fabricating papers', async () => {
@@ -449,7 +490,8 @@ describe('LiteratureSearchService', () => {
     expect(outcome.status).toBe('empty')
     expect(outcome.literature).toEqual([])
     expect(outcome.error).toBeNull()
-    expect(outcome.totalFound).toBe(0)
+    expect(outcome.totalMatched).toBe(0)
+    expect(outcome.totalFetched).toBe(0)
   })
 
   it('returns failed with empty literature when every query fails', async () => {
@@ -465,7 +507,11 @@ describe('LiteratureSearchService', () => {
     expect(outcome.literature).toEqual([])
     expect(outcome.error).toContain('429')
     expect(outcome.warnings).toHaveLength(4)
-    expect(outcome.totalFound).toBe(0)
+    expect(outcome.totalMatched).toBe(0)
+    expect(outcome.totalFetched).toBe(0)
+    expect(outcome.queryStats.every((stat) => stat.status === 'failed')).toBe(
+      true,
+    )
   })
 
   it('keeps successful results when only some queries fail', async () => {
@@ -485,6 +531,36 @@ describe('LiteratureSearchService', () => {
     expect(outcome.literature).toHaveLength(3)
     expect(outcome.warnings).toHaveLength(1)
     expect(outcome.error).toContain('部分查询失败')
+    expect(outcome.totalMatched).toBe(3)
+    expect(outcome.totalFetched).toBe(3)
+    expect(
+      outcome.queryStats.filter((stat) => stat.status === 'failed'),
+    ).toHaveLength(1)
+  })
+
+  it('distinguishes API total, fetched papers and retained unique papers', async () => {
+    const provider = new RecordingProvider((_query, index) => ({
+      total: 100 + index,
+      papers: Array.from({ length: 5 }, (_, item) =>
+        paper(`p${index}-${item}`, `Paper ${index}-${item}`),
+      ),
+    }))
+    const service = new LiteratureSearchService({ provider })
+
+    const outcome = await service.search(
+      { plannerKeywords, retrievalPlan },
+      new AbortController().signal,
+    )
+
+    expect(outcome.totalMatched).toBe(100 + 101 + 102 + 103)
+    expect(outcome.totalFetched).toBe(20)
+    expect(outcome.literature).toHaveLength(8)
+    expect(outcome.queryStats.map((stat) => stat.totalMatched)).toEqual([
+      100, 101, 102, 103,
+    ])
+    expect(
+      outcome.queryStats.every((stat) => stat.totalFetched === 5),
+    ).toBe(true)
   })
 
   it('does not contact the provider when the signal is already aborted', async () => {

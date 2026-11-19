@@ -262,7 +262,6 @@ controller = new TaskController({
     getConfig: () => toLLMConfig(ConfigService.read()),
     literatureSearch: new LiteratureSearchService({
       provider: new SemanticScholarApiProvider(),
-      getApiKey: () => ConfigService.read().semanticScholarApiKey,
     }),
   },
   onUpdate: (session, meta) => {

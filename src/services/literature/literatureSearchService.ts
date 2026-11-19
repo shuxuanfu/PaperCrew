@@ -5,6 +5,7 @@ import {
   DEFAULT_QUERY_LIMIT,
 } from '@/services/literature/semanticScholarProvider'
 import type {
+  LiteratureQueryStat,
   LiteratureSearch,
   LiteratureSearchInput,
   LiteratureSearchOutcome,
@@ -18,7 +19,6 @@ const MAX_QUERIES = 4
 
 export interface LiteratureSearchServiceOptions {
   provider: SemanticScholarProvider
-  getApiKey?: () => string | null | undefined
   limitPerQuery?: number
   maxResults?: number
   timeoutMs?: number
@@ -81,7 +81,6 @@ function mergeResults(
 
 export class LiteratureSearchService implements LiteratureSearch {
   private readonly provider: SemanticScholarProvider
-  private readonly getApiKey?: () => string | null | undefined
   private readonly limitPerQuery: number
   private readonly maxResults: number
   private readonly timeoutMs: number
@@ -89,7 +88,6 @@ export class LiteratureSearchService implements LiteratureSearch {
 
   constructor(options: LiteratureSearchServiceOptions) {
     this.provider = options.provider
-    this.getApiKey = options.getApiKey
     this.limitPerQuery = options.limitPerQuery ?? DEFAULT_QUERY_LIMIT
     this.maxResults = options.maxResults ?? DEFAULT_MAX_RESULTS
     this.timeoutMs = options.timeoutMs ?? DEFAULT_LITERATURE_TIMEOUT_MS
@@ -113,10 +111,12 @@ export class LiteratureSearchService implements LiteratureSearch {
         literature: [],
         status: 'empty',
         queries,
+        queryStats: [],
         searchedAt,
         durationMs: Date.now() - startedAt,
-        totalFound: 0,
-        error: '没有可用的英文检索关键词，未发起 Semantic Scholar 请求。',
+        totalMatched: 0,
+        totalFetched: 0,
+        error: '没有可用的英文检索关键词，未发起文献代理请求。',
         warnings: [],
       }
     }
@@ -125,10 +125,11 @@ export class LiteratureSearchService implements LiteratureSearch {
       throw new LiteratureCancelledError()
     }
 
-    const apiKey = this.getApiKey?.() ?? null
     const groups: SemanticScholarPaper[][] = []
+    const queryStats: LiteratureQueryStat[] = []
     const warnings: string[] = []
-    let totalFound = 0
+    let totalMatched = 0
+    let totalFetched = 0
     let succeeded = 0
 
     for (const query of queries) {
@@ -138,18 +139,31 @@ export class LiteratureSearchService implements LiteratureSearch {
       try {
         const result = await this.provider.search(query, {
           signal,
-          apiKey,
           limit: this.limitPerQuery,
           timeoutMs: this.timeoutMs,
         })
+        const fetched = result.papers.length
         groups.push(result.papers)
-        totalFound += result.papers.length
+        totalMatched += result.total
+        totalFetched += fetched
         succeeded += 1
+        queryStats.push({
+          query,
+          status: 'completed',
+          totalMatched: result.total,
+          totalFetched: fetched,
+        })
       } catch (error) {
         if (signal.aborted || error instanceof LiteratureCancelledError) {
           throw new LiteratureCancelledError()
         }
         groups.push([])
+        queryStats.push({
+          query,
+          status: 'failed',
+          totalMatched: null,
+          totalFetched: 0,
+        })
         warnings.push(
           `${query}：${
             error instanceof Error ? error.message : '未知检索错误'
@@ -163,9 +177,11 @@ export class LiteratureSearchService implements LiteratureSearch {
         literature: [],
         status: 'failed',
         queries,
+        queryStats,
         searchedAt,
         durationMs: Date.now() - startedAt,
-        totalFound: 0,
+        totalMatched: 0,
+        totalFetched: 0,
         error:
           warnings[0] ??
           'Semantic Scholar 检索失败：所有查询均未成功返回。',
@@ -178,9 +194,11 @@ export class LiteratureSearchService implements LiteratureSearch {
       literature,
       status: literature.length > 0 ? 'completed' : 'empty',
       queries,
+      queryStats,
       searchedAt,
       durationMs: Date.now() - startedAt,
-      totalFound,
+      totalMatched,
+      totalFetched,
       error:
         warnings.length > 0
           ? `部分查询失败：${warnings.join('；')}`

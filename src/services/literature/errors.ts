@@ -28,7 +28,7 @@ export class LiteratureConfigError extends LiteratureError {
 
 export class LiteratureAuthError extends LiteratureError {
   constructor(
-    message = 'Semantic Scholar 认证失败：请检查 API Key，或清空 Key 后使用匿名访问。',
+    message = '文献代理认证失败：请检查后端 SEMANTIC_SCHOLAR_API_KEY 配置。',
   ) {
     super(message, 'auth')
     this.name = 'LiteratureAuthError'
@@ -44,7 +44,7 @@ export class LiteratureRequestError extends LiteratureError {
 
 export class LiteratureRateLimitError extends LiteratureError {
   constructor(
-    message = 'Semantic Scholar 请求受限（429）：请稍后重试，或在 API Settings 中配置 Semantic Scholar API Key 提高额度。',
+    message = 'Semantic Scholar 请求受限（429）：请稍后重试；匿名额度较低，可在后端配置 API Key。',
   ) {
     super(message, 'rate_limit')
     this.name = 'LiteratureRateLimitError'
@@ -52,7 +52,9 @@ export class LiteratureRateLimitError extends LiteratureError {
 }
 
 export class LiteratureServerError extends LiteratureError {
-  constructor(message = 'Semantic Scholar 服务暂时不可用（5xx）：请稍后重试。') {
+  constructor(
+    message = '文献代理无法正常访问 Semantic Scholar（5xx）：请检查后端网络与配置。',
+  ) {
     super(message, 'server')
     this.name = 'LiteratureServerError'
   }
@@ -60,7 +62,7 @@ export class LiteratureServerError extends LiteratureError {
 
 export class LiteratureNetworkError extends LiteratureError {
   constructor(
-    message = 'Semantic Scholar 网络请求失败：可能是网络、CORS 或接口不可达。',
+    message = '无法连接文献代理：请确认后端已启动、地址正确且 CORS 允许当前前端来源。',
   ) {
     super(message, 'network')
     this.name = 'LiteratureNetworkError'

@@ -49,7 +49,6 @@ export interface SemanticScholarSearchResult {
 
 export interface SemanticScholarSearchOptions {
   signal?: AbortSignal
-  apiKey?: string | null
   timeoutMs?: number
   limit?: number
 }
@@ -66,13 +65,22 @@ export interface LiteratureSearchInput {
   retrievalPlan: RetrievalPlan
 }
 
+export interface LiteratureQueryStat {
+  query: string
+  status: 'completed' | 'failed'
+  totalMatched: number | null
+  totalFetched: number
+}
+
 export interface LiteratureSearchOutcome {
   literature: LiteratureClue[]
   status: Extract<LiteratureRetrievalStatus, 'completed' | 'empty' | 'failed'>
   queries: string[]
+  queryStats: LiteratureQueryStat[]
   searchedAt: string
   durationMs: number
-  totalFound: number
+  totalMatched: number
+  totalFetched: number
   error: string | null
   warnings: string[]
 }

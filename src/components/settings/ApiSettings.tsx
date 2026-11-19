@@ -68,10 +68,6 @@ function ApiSettingsDialog() {
   const [maxTokens, setMaxTokens] = useState(String(api.maxTokens))
   const [jsonMode, setJsonMode] = useState(api.jsonMode)
   const [showKey, setShowKey] = useState(false)
-  const [semanticScholarApiKey, setSemanticScholarApiKey] = useState(
-    api.semanticScholarApiKey,
-  )
-  const [showScholarKey, setShowScholarKey] = useState(false)
   const [issues, setIssues] = useState<SetupIssue[]>([])
   const [testState, setTestState] = useState<TestState>({ status: 'idle' })
   const urlRef = useRef<HTMLInputElement>(null)
@@ -94,7 +90,6 @@ function ApiSettingsDialog() {
     temperature: Number(temperature),
     maxTokens: Number(maxTokens),
     jsonMode,
-    semanticScholarApiKey,
   }
 
   const issueFor = (field: SetupIssue['field']) =>
@@ -155,8 +150,6 @@ function ApiSettingsDialog() {
     setMaxTokens(String(DEFAULT_MAX_TOKENS))
     setJsonMode(true)
     setShowKey(false)
-    setSemanticScholarApiKey('')
-    setShowScholarKey(false)
     setIssues([])
     setTestState({ status: 'idle' })
   }
@@ -210,8 +203,9 @@ function ApiSettingsDialog() {
             <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2.5">
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning-ink" />
               <p className="text-[10.5px] leading-[1.6] text-warning-ink">
-                API Key 将在浏览器环境中使用，localStorage
-                不是安全密钥存储。仅建议用于个人开发和可信环境下的演示。公开部署应通过后端代理保护密钥。
+                LLM API Key 将在浏览器环境中使用，localStorage
+                不是安全密钥存储，仅建议用于个人开发和可信环境。Semantic Scholar
+                API Key 已移至后端代理环境变量，不再由浏览器保存或发送。
               </p>
             </div>
 
@@ -262,49 +256,6 @@ function ApiSettingsDialog() {
                 </button>
               </div>
               <IssueText message={issueFor('apiKey')} />
-            </Field>
-
-            <Field
-              id="semantic-scholar-key"
-              label="Semantic Scholar API Key"
-              hint="Optional"
-            >
-              <div className="relative">
-                <input
-                  id="semantic-scholar-key"
-                  type={showScholarKey ? 'text' : 'password'}
-                  value={semanticScholarApiKey}
-                  onChange={(event) => {
-                    setSemanticScholarApiKey(event.target.value)
-                  }}
-                  placeholder="Optional · anonymous access is rate-limited"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className={`${INPUT_CLASS} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowScholarKey((value) => !value)}
-                  aria-label={
-                    showScholarKey
-                      ? 'Hide Semantic Scholar API key'
-                      : 'Show Semantic Scholar API key'
-                  }
-                  className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted transition-colors hover:bg-canvas hover:text-ink"
-                >
-                  {showScholarKey ? (
-                    <EyeOff className="size-3.5" />
-                  ) : (
-                    <Eye className="size-3.5" />
-                  )}
-                </button>
-              </div>
-              <p className="mt-1 text-[10px] leading-4 text-muted">
-                Used only for paper search via{' '}
-                <span className="font-mono">api.semanticscholar.org</span>. It is
-                not sent to the LLM provider. Leave empty to use anonymous
-                access.
-              </p>
             </Field>
 
             <Field id="api-model" label="Model Name" hint="Required">

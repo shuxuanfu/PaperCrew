@@ -13,9 +13,14 @@ import type {
 } from '@/services/llm/llmProvider'
 import { AgentExecutionError, LLMError } from '@/services/llm/errors'
 import { parseJsonResponse } from '@/services/llm/responseParser'
+import {
+  appendProgrammaticReferences,
+  citationIssues,
+} from '@/agents/synthesizerCitations'
 import { AGENT_DEFINITIONS } from '@/domain/agent/definitions'
 import { LIVE_PROMPTS } from '@/prompts'
 import { liveAgentOutputSchemas } from '@/schemas/liveSchemas'
+import type { LiteratureClue } from '@/types/research'
 
 const MAX_REPORTED_ISSUES = 8
 
@@ -64,8 +69,15 @@ function crossAgentIssues(
       (item) => item.agentId === 'researcher',
     )
     if (!researcher || researcher.output.type !== 'researcher') {
-      return []
+      return output.finalReport.includes('[S2:')
+        ? ['缺少上游 Researcher 输出，无法校验最终报告的真实文献引用']
+        : []
     }
+
+    const issues = citationIssues(
+      output.finalReport,
+      researcher.output.literature,
+    )
     const knownDois = new Set(
       researcher.output.literature
         .map((item) => item.doi?.toLowerCase())
@@ -73,12 +85,15 @@ function crossAgentIssues(
     )
     const citedDois =
       output.finalReport.match(/\b10\.\d{4,9}\/[^\s<>"')\]]+/g) ?? []
-    return [...new Set(citedDois.map((doi) => doi.replace(/[.,;]+$/, '')))]
-      .filter((doi) => !knownDois.has(doi.toLowerCase()))
-      .map(
-        (doi) =>
-          `最终报告引用了未由 Semantic Scholar 返回的 DOI ${doi}，不得编造参考文献`,
+    const unknownDois = [
+      ...new Set(citedDois.map((doi) => doi.replace(/[.,;]+$/, ''))),
+    ].filter((doi) => !knownDois.has(doi.toLowerCase()))
+    unknownDois.forEach((doi) => {
+      issues.push(
+        `最终报告引用了未由 Semantic Scholar 返回的 DOI ${doi}，不得编造参考文献`,
       )
+    })
+    return issues
   }
 
   const planner = context.upstream.find((item) => item.agentId === 'planner')
@@ -215,6 +230,26 @@ export class LLMExecutor implements AgentExecutor {
     const crossIssues = crossAgentIssues(output, context)
     if (crossIssues.length > 0) {
       return { ok: false, issues: crossIssues }
+    }
+
+    if (output.type === 'synthesizer') {
+      const researcher = context.upstream.find(
+        (item) => item.agentId === 'researcher',
+      )
+      const literature: LiteratureClue[] =
+        researcher?.output.type === 'researcher'
+          ? researcher.output.literature
+          : []
+      return {
+        ok: true,
+        output: {
+          ...output,
+          finalReport: appendProgrammaticReferences(
+            output.finalReport,
+            literature,
+          ),
+        },
+      }
     }
 
     return { ok: true, output }

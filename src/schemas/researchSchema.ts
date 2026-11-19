@@ -82,9 +82,17 @@ export const literatureRetrievalStatusSchema = z.enum([
   'failed',
 ])
 
+export const literatureQueryStatSchema = z.object({
+  query: z.string().min(1),
+  status: z.enum(['completed', 'failed']),
+  totalMatched: z.number().int().nonnegative().nullable(),
+  totalFetched: z.number().int().nonnegative(),
+})
+
 export const literatureRetrievalSchema = z.object({
   status: literatureRetrievalStatusSchema,
   queries: z.array(z.string().min(1)).max(8, '检索词最多 8 条'),
+  queryStats: z.array(literatureQueryStatSchema).max(8).optional(),
   searchedAt: z
     .string()
     .refine((value) => !Number.isNaN(Date.parse(value)), {
@@ -92,7 +100,8 @@ export const literatureRetrievalSchema = z.object({
     })
     .nullable(),
   durationMs: z.number().int().nonnegative(),
-  totalFound: z.number().int().nonnegative(),
+  totalMatched: z.number().int().nonnegative(),
+  totalFetched: z.number().int().nonnegative(),
   totalReturned: z.number().int().nonnegative(),
   error: z.string().nullable(),
   warnings: z.array(z.string()).max(8).optional(),
@@ -171,6 +180,7 @@ export type ResearchQuestion = z.infer<typeof researchQuestionSchema>
 export type SearchKeywordGroup = z.infer<typeof searchKeywordGroupSchema>
 export type ResearchPlan = z.infer<typeof researchPlanSchema>
 export type LiteratureClue = z.infer<typeof literatureClueSchema>
+export type LiteratureQueryStat = z.infer<typeof literatureQueryStatSchema>
 export type LiteratureRetrieval = z.infer<typeof literatureRetrievalSchema>
 export type LiteratureRetrievalStatus = z.infer<
   typeof literatureRetrievalStatusSchema

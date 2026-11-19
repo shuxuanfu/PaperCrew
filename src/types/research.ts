@@ -1,5 +1,6 @@
 export type {
   LiteratureClue,
+  LiteratureQueryStat,
   LiteratureRetrieval,
   LiteratureRetrievalStatus,
   Relevance,

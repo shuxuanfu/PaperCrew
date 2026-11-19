@@ -17,5 +17,4 @@ export interface ApiSettings {
   temperature: number
   maxTokens: number
   jsonMode: boolean
-  semanticScholarApiKey: string
 }
