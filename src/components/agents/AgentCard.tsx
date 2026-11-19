@@ -84,7 +84,11 @@ function outputHighlights(output: AgentOutput): string[] {
     case 'researcher':
       return output.literature.length > 0
         ? output.literature.map((item) => item.title)
-        : ['No real sources retrieved in LIVE mode']
+        : [
+            output.retrieval?.status === 'failed'
+              ? 'Semantic Scholar search failed — no papers fabricated'
+              : 'No real sources retrieved in LIVE mode',
+          ]
     case 'reviewer':
       return output.review.map(
         (item) => `${item.title} · ${item.severity.toUpperCase()}`,

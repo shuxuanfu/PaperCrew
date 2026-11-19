@@ -1,5 +1,7 @@
 export type {
   LiteratureClue,
+  LiteratureRetrieval,
+  LiteratureRetrievalStatus,
   Relevance,
   ResearchPlan,
   ResearchQuestion,

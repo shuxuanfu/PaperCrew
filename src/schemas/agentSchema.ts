@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import {
   literatureClueSchema,
+  literatureRetrievalSchema,
   researchQuestionSchema,
   retrievalPlanSchema,
   reviewerCommentSchema,
@@ -52,6 +53,7 @@ export const researcherAgentOutputSchema = z.object({
     .array(literatureClueSchema)
     .min(5, 'Researcher 至少需要提供 5 条研究线索'),
   retrievalPlan: retrievalPlanSchema.optional(),
+  retrieval: literatureRetrievalSchema.optional(),
 })
 
 export const reviewerAgentOutputSchema = z.object({

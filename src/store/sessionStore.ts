@@ -3,6 +3,8 @@ import { create } from 'zustand'
 import { TaskController } from '@/engine/taskController'
 import type { LiveInput } from '@/engine/livePlayer'
 import { ConfigService } from '@/services/config/configService'
+import { LiteratureSearchService } from '@/services/literature/literatureSearchService'
+import { SemanticScholarApiProvider } from '@/services/literature/semanticScholarProvider'
 import { toLLMConfig } from '@/services/llm/llmConfig'
 import { OpenAICompatibleProvider } from '@/services/llm/openAICompatibleProvider'
 import type { AgentId, AgentStatus } from '@/types/agent'
@@ -258,6 +260,10 @@ controller = new TaskController({
   live: {
     provider: new OpenAICompatibleProvider(),
     getConfig: () => toLLMConfig(ConfigService.read()),
+    literatureSearch: new LiteratureSearchService({
+      provider: new SemanticScholarApiProvider(),
+      getApiKey: () => ConfigService.read().semanticScholarApiKey,
+    }),
   },
   onUpdate: (session, meta) => {
     useSessionStore.setState((state) => ({

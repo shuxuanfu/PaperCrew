@@ -127,6 +127,7 @@ export class ConfigService {
       temperature: api.temperature,
       maxTokens: api.maxTokens,
       jsonMode: api.jsonMode,
+      semanticScholarApiKey: api.semanticScholarApiKey.trim(),
     })
     return []
   }

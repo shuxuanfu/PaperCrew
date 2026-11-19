@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import {
   literatureClueSchema,
+  literatureRetrievalSchema,
   researchQuestionSchema,
   retrievalPlanSchema,
   reviewerCommentSchema,
@@ -27,14 +28,14 @@ const liveLiteratureClueSchema = literatureClueSchema.superRefine(
       ctx.addIssue({
         code: 'custom',
         path: ['sourceType'],
-        message: 'LIVE 模式尚未接入真实文献检索，sourceType 必须为 simulated',
+        message: '模型不得直接生成真实文献，sourceType 必须为 simulated',
       })
     }
     if (clue.doi !== null || clue.url !== null) {
       ctx.addIssue({
         code: 'custom',
         path: ['doi'],
-        message: 'LIVE 模式不允许返回 DOI 或 URL',
+        message: '模型生成的文献不允许返回 DOI 或 URL',
       })
     }
   },
@@ -70,14 +71,44 @@ const livePlannerOutputSchema = z
     }
   })
 
-const liveResearcherOutputSchema = z.object({
+const liveResearcherPlanSchema = z.object({
   type: z.literal('researcher'),
   summary: z.string().min(20, 'Researcher 输出摘要至少 20 个字符'),
   literature: z
     .array(liveLiteratureClueSchema)
-    .max(8, '模拟线索最多 8 条'),
+    .max(0, '模型不得直接生成文献，真实文献由 Semantic Scholar 检索注入'),
   retrievalPlan: retrievalPlanSchema,
 })
+
+export const liveResearcherFinalSchema = z
+  .object({
+    type: z.literal('researcher'),
+    summary: z.string().min(20, 'Researcher 输出摘要至少 20 个字符'),
+    literature: z
+      .array(literatureClueSchema)
+      .max(8, '真实文献最多保留 8 条'),
+    retrievalPlan: retrievalPlanSchema,
+    retrieval: literatureRetrievalSchema,
+  })
+  .superRefine((output, ctx) => {
+    const ids = output.literature.map((item) => item.id)
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['literature'],
+        message: '真实文献 paperId 不得重复',
+      })
+    }
+    output.literature.forEach((item, index) => {
+      if (item.sourceType !== 'real') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['literature', index, 'sourceType'],
+          message: 'LIVE 最终文献必须全部来自真实检索',
+        })
+      }
+    })
+  })
 
 const liveReviewerOutputSchema = z.object({
   type: z.literal('reviewer'),
@@ -125,7 +156,7 @@ export const liveAgentOutputSchemas: Record<
   z.ZodType<AgentOutput>
 > = {
   planner: livePlannerOutputSchema,
-  researcher: liveResearcherOutputSchema,
+  researcher: liveResearcherPlanSchema,
   reviewer: liveReviewerOutputSchema,
   synthesizer: liveSynthesizerOutputSchema,
 }

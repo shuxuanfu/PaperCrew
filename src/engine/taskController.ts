@@ -10,6 +10,7 @@ import type { AgentId } from '@/domain/agent/ids'
 import type { DemoSession } from '@/types/session'
 import type { LLMConfig } from '@/services/llm/llmConfig'
 import type { LLMProvider } from '@/services/llm/llmProvider'
+import type { LiteratureSearch } from '@/services/literature/semanticScholarTypes'
 
 interface SessionPlayer {
   createSession: () => RunSession
@@ -19,6 +20,7 @@ interface SessionPlayer {
 export interface LiveDependencies {
   provider: LLMProvider
   getConfig: () => LLMConfig
+  literatureSearch?: LiteratureSearch
 }
 
 export interface TaskControllerOptions {
@@ -71,6 +73,7 @@ export class TaskController {
         new LivePlayer(input, {
           provider: live.provider,
           getConfig: live.getConfig,
+          literatureSearch: live.literatureSearch,
           now: this.options.now,
           onUpdate,
         }),

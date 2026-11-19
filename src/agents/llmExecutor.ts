@@ -55,8 +55,30 @@ function crossAgentIssues(
   output: AgentOutput,
   context: AgentContext,
 ): string[] {
-  if (output.type === 'planner' || output.type === 'synthesizer') {
+  if (output.type === 'planner') {
     return []
+  }
+
+  if (output.type === 'synthesizer') {
+    const researcher = context.upstream.find(
+      (item) => item.agentId === 'researcher',
+    )
+    if (!researcher || researcher.output.type !== 'researcher') {
+      return []
+    }
+    const knownDois = new Set(
+      researcher.output.literature
+        .map((item) => item.doi?.toLowerCase())
+        .filter((doi): doi is string => Boolean(doi)),
+    )
+    const citedDois =
+      output.finalReport.match(/\b10\.\d{4,9}\/[^\s<>"')\]]+/g) ?? []
+    return [...new Set(citedDois.map((doi) => doi.replace(/[.,;]+$/, '')))]
+      .filter((doi) => !knownDois.has(doi.toLowerCase()))
+      .map(
+        (doi) =>
+          `最终报告引用了未由 Semantic Scholar 返回的 DOI ${doi}，不得编造参考文献`,
+      )
   }
 
   const planner = context.upstream.find((item) => item.agentId === 'planner')

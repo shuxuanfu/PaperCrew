@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LLMExecutor } from '@/agents/llmExecutor'
 import { LivePlayer } from '@/engine/livePlayer'
 import { TaskController } from '@/engine/taskController'
+import { LiteratureCancelledError } from '@/services/literature/errors'
+import type {
+  LiteratureSearch,
+  LiteratureSearchInput,
+  LiteratureSearchOutcome,
+} from '@/services/literature/semanticScholarTypes'
 import {
   AgentExecutionError,
   LLMAuthError,
@@ -30,6 +36,7 @@ import type {
   ReviewerAgentOutput,
   SynthesizerAgentOutput,
 } from '@/types/agent'
+import type { LiteratureClue } from '@/types/research'
 
 const delay = (ms: number) =>
   new Promise((resolve) => {
@@ -258,6 +265,69 @@ const VALID_PIPELINE = [
   reviewerOutput,
   synthesizerOutput,
 ]
+
+const REAL_PAPER: LiteratureClue = {
+  id: 's2-paper-1',
+  title: 'Domain Generalization for Medical Image Segmentation',
+  authors: ['Ada Lovelace'],
+  year: 2023,
+  venue: 'MICCAI',
+  abstract:
+    'A domain generalization benchmark for medical image segmentation across centers.',
+  relevance: 'high',
+  sourceType: 'real',
+  doi: '10.1000/papercrew-test',
+  url: 'https://www.semanticscholar.org/paper/s2-paper-1',
+  openAccessPdf: null,
+  citationCount: 12,
+  referenceCount: 30,
+  relatedQuestionIds: [],
+}
+
+const COMPLETED_OUTCOME: LiteratureSearchOutcome = {
+  literature: [REAL_PAPER],
+  status: 'completed',
+  queries: ['domain generalization medical image segmentation'],
+  searchedAt: '2026-01-01T00:00:00.000Z',
+  durationMs: 12,
+  totalFound: 1,
+  error: null,
+  warnings: [],
+}
+
+class StaticLiteratureSearch implements LiteratureSearch {
+  calls = 0
+  readonly inputs: LiteratureSearchInput[] = []
+
+  constructor(private readonly outcome: LiteratureSearchOutcome) {}
+
+  async search(
+    input: LiteratureSearchInput,
+    _signal: AbortSignal,
+  ): Promise<LiteratureSearchOutcome> {
+    this.calls += 1
+    this.inputs.push(input)
+    return structuredClone(this.outcome)
+  }
+}
+
+class HangingLiteratureSearch implements LiteratureSearch {
+  calls = 0
+
+  async search(
+    _input: LiteratureSearchInput,
+    signal: AbortSignal,
+  ): Promise<LiteratureSearchOutcome> {
+    this.calls += 1
+    return new Promise<LiteratureSearchOutcome>((_resolve, reject) => {
+      signal.addEventListener(
+        'abort',
+        () => reject(new LiteratureCancelledError()),
+        { once: true },
+      )
+    })
+  }
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -846,5 +916,160 @@ describe('LIVE session and orchestration', () => {
     expect(session?.agents[0]?.status).toBe('skipped')
     expect(session?.agents[0]?.output).toBeNull()
     expect(provider.calls).toBe(1)
+  })
+})
+
+describe('LIVE literature retrieval workflow', () => {
+  it('injects Semantic Scholar papers into the Researcher output and downstream agents', async () => {
+    const provider = new ScriptedProvider(
+      VALID_PIPELINE.map((output) => JSON.stringify(output)),
+    )
+    const literatureSearch = new StaticLiteratureSearch(COMPLETED_OUTCOME)
+    const controller = new TaskController({
+      live: {
+        provider,
+        getConfig: () => CONFIG,
+        literatureSearch,
+      },
+      resolveStepDuration: () => 0,
+    })
+
+    await controller.startLive({
+      topic: '小样本医学图像分割的泛化性改进研究',
+      description: null,
+    })
+    const session = controller.getSession()
+    const researcher = session?.agents[1]
+
+    expect(session?.status).toBe('completed')
+    expect(literatureSearch.calls).toBe(1)
+    expect(literatureSearch.inputs[0].plannerKeywords).toHaveLength(2)
+    expect(literatureSearch.inputs[0].retrievalPlan.keywordGroups).toEqual(
+      researcherOutput.retrievalPlan?.keywordGroups,
+    )
+    expect(researcher?.status).toBe('completed')
+    if (researcher?.output?.type !== 'researcher') {
+      throw new Error('Researcher output missing')
+    }
+    expect(researcher.output.literature).toEqual([REAL_PAPER])
+    expect(researcher.output.retrieval?.status).toBe('completed')
+    expect(researcher.output.retrieval?.totalReturned).toBe(1)
+    expect(researcher.output.summary).toContain('Semantic Scholar')
+
+    expect(provider.requests[2].messages.at(-1)?.content).toContain(
+      REAL_PAPER.title,
+    )
+    expect(provider.requests[3].messages.at(-1)?.content).toContain(
+      REAL_PAPER.doi,
+    )
+  })
+
+  it('keeps the run alive on a failed search without fabricating papers', async () => {
+    const provider = new ScriptedProvider(
+      VALID_PIPELINE.map((output) => JSON.stringify(output)),
+    )
+    const literatureSearch = new StaticLiteratureSearch({
+      ...COMPLETED_OUTCOME,
+      literature: [],
+      status: 'failed',
+      totalFound: 0,
+      error: 'Semantic Scholar 请求受限（429）：请稍后重试。',
+      warnings: ['Semantic Scholar 请求受限（429）：请稍后重试。'],
+    })
+    const controller = new TaskController({
+      live: {
+        provider,
+        getConfig: () => CONFIG,
+        literatureSearch,
+      },
+      resolveStepDuration: () => 0,
+    })
+
+    await controller.startLive({
+      topic: '小样本医学图像分割的泛化性改进研究',
+      description: null,
+    })
+    const session = controller.getSession()
+    const researcher = session?.agents[1]
+
+    expect(session?.status).toBe('completed')
+    expect(researcher?.status).toBe('completed')
+    if (researcher?.output?.type !== 'researcher') {
+      throw new Error('Researcher output missing')
+    }
+    expect(researcher.output.literature).toEqual([])
+    expect(researcher.output.retrieval?.status).toBe('failed')
+    expect(researcher.output.retrieval?.error).toContain('429')
+    expect(researcher.output.summary).toContain('未使用模拟或虚构论文替代')
+    expect(session?.agents.some((agent) => agent.status === 'fallback')).toBe(
+      false,
+    )
+  })
+
+  it('records an empty search outcome without substituting demo literature', async () => {
+    const provider = new ScriptedProvider(
+      VALID_PIPELINE.map((output) => JSON.stringify(output)),
+    )
+    const literatureSearch = new StaticLiteratureSearch({
+      ...COMPLETED_OUTCOME,
+      literature: [],
+      status: 'empty',
+      totalFound: 0,
+      error: null,
+      warnings: [],
+    })
+    const controller = new TaskController({
+      live: {
+        provider,
+        getConfig: () => CONFIG,
+        literatureSearch,
+      },
+      resolveStepDuration: () => 0,
+    })
+
+    await controller.startLive({
+      topic: '小样本医学图像分割的泛化性改进研究',
+      description: null,
+    })
+    const researcher = controller.getSession()?.agents[1]
+
+    expect(researcher?.status).toBe('completed')
+    if (researcher?.output?.type !== 'researcher') {
+      throw new Error('Researcher output missing')
+    }
+    expect(researcher.output.literature).toEqual([])
+    expect(researcher.output.retrieval?.status).toBe('empty')
+    expect(researcher.output.retrieval?.totalReturned).toBe(0)
+  })
+
+  it('cancels an in-flight Semantic Scholar search with the session', async () => {
+    const provider = new ScriptedProvider([
+      JSON.stringify(plannerOutput),
+      JSON.stringify(researcherOutput),
+    ])
+    const literatureSearch = new HangingLiteratureSearch()
+    const controller = new TaskController({
+      live: {
+        provider,
+        getConfig: () => CONFIG,
+        literatureSearch,
+      },
+      resolveStepDuration: () => 0,
+    })
+
+    const run = controller.startLive({
+      topic: '小样本医学图像分割的泛化性改进研究',
+      description: null,
+    })
+    await waitFor(() => literatureSearch.calls === 1)
+    await controller.cancel()
+    await run
+
+    const session = controller.getSession()
+    const researcher = session?.agents[1]
+    expect(session?.status).toBe('cancelled')
+    expect(researcher?.status).toBe('skipped')
+    expect(researcher?.output).toBeNull()
+    expect(literatureSearch.calls).toBe(1)
   })
 })

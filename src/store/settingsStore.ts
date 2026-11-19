@@ -15,6 +15,7 @@ export const EMPTY_API_SETTINGS: ApiSettings = {
   temperature: DEFAULT_TEMPERATURE,
   maxTokens: DEFAULT_MAX_TOKENS,
   jsonMode: true,
+  semanticScholarApiKey: '',
 }
 
 interface SettingsState {

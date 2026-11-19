@@ -1,9 +1,11 @@
 import { LLMExecutor } from '@/agents/llmExecutor'
+import { LiteratureResearcherExecutor } from '@/agents/literatureResearcherExecutor'
 import { AGENT_DEFINITIONS } from '@/domain/agent/definitions'
 import { AGENT_IDS } from '@/domain/agent/ids'
 import { Orchestrator } from '@/engine/orchestrator'
 import type { LLMConfig } from '@/services/llm/llmConfig'
 import type { LLMProvider } from '@/services/llm/llmProvider'
+import type { LiteratureSearch } from '@/services/literature/semanticScholarTypes'
 import type {
   ExecutionUpdateHandler,
   RunAgent,
@@ -20,6 +22,7 @@ export interface LiveInput {
 export interface LivePlayerOptions {
   provider: LLMProvider
   getConfig: () => LLMConfig
+  literatureSearch?: LiteratureSearch
   now?: () => string
   onUpdate?: ExecutionUpdateHandler
 }
@@ -97,10 +100,16 @@ export class LivePlayer {
   }
 
   createOrchestrator(session: RunSession): Orchestrator {
-    const executor = new LLMExecutor({
+    const llmExecutor = new LLMExecutor({
       provider: this.options.provider,
       getConfig: this.options.getConfig,
     })
+    const executor = this.options.literatureSearch
+      ? new LiteratureResearcherExecutor(
+          llmExecutor,
+          this.options.literatureSearch,
+        )
+      : llmExecutor
 
     return new Orchestrator(session, {
       executor,

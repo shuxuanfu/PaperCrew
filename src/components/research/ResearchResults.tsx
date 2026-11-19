@@ -134,6 +134,13 @@ export function ResearchResults() {
     if (!outputReady) {
       const isRunning = producerStatus === 'running'
       const isFailed = producerStatus === 'failed'
+      const isSearchingLiterature =
+        isRunning &&
+        producerId === 'researcher' &&
+        currentSession.mode === 'live'
+      const waitingMessage = isSearchingLiterature
+        ? 'Searching Semantic Scholar for real papers. Only metadata returned by the API will be displayed; no simulated papers are substituted.'
+        : STATUS_MESSAGE[producerAgent.status]
       return (
         <div
           className={`rounded-xl px-4 py-5 ${
@@ -155,7 +162,9 @@ export function ResearchResults() {
                 isFailed ? 'text-danger-ink' : 'text-ink'
               }`}
             >
-              Waiting for {AGENT_LABEL[producerId]}
+              {isSearchingLiterature
+                ? 'Searching Semantic Scholar'
+                : `Waiting for ${AGENT_LABEL[producerId]}`}
             </p>
           </div>
           <p
@@ -167,7 +176,7 @@ export function ResearchResults() {
               ? (producerAgent.error ??
                 executionError ??
                 STATUS_MESSAGE.failed)
-              : STATUS_MESSAGE[producerAgent.status]}
+              : waitingMessage}
           </p>
           {sessionStatus === 'paused' ? (
             <p className="mt-2 text-[10.5px] text-warning-ink">
@@ -199,6 +208,7 @@ export function ResearchResults() {
         <LiteratureList
           literature={output.literature}
           retrievalPlan={output.retrievalPlan ?? null}
+          retrieval={output.retrieval ?? null}
           live={currentSession.mode === 'live'}
         />
       )

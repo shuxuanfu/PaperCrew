@@ -70,31 +70,62 @@ export const researchPlanSchema = z
     }
   })
 
+const httpUrlSchema = z
+  .string()
+  .regex(/^https?:\/\//, 'url 必须使用 http(s) 协议')
+
+export const literatureRetrievalStatusSchema = z.enum([
+  'idle',
+  'searching',
+  'completed',
+  'empty',
+  'failed',
+])
+
+export const literatureRetrievalSchema = z.object({
+  status: literatureRetrievalStatusSchema,
+  queries: z.array(z.string().min(1)).max(8, '检索词最多 8 条'),
+  searchedAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: '检索时间必须是可解析的 ISO 时间戳',
+    })
+    .nullable(),
+  durationMs: z.number().int().nonnegative(),
+  totalFound: z.number().int().nonnegative(),
+  totalReturned: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+  warnings: z.array(z.string()).max(8).optional(),
+})
+
 export const literatureClueSchema = z
   .object({
     id: z.string().min(1, '文献 id 不能为空'),
-    title: z.string().min(8, '文献标题过短'),
-    authors: z.array(z.string().min(1)).min(1, '至少需要一位作者'),
-    year: z.number().int().min(1900).max(2100),
-    venue: z.string().min(3, '发表渠道过短'),
-    abstract: z.string().min(40, '摘要至少 40 个字符'),
+    title: z.string().min(1, '文献标题不能为空'),
+    authors: z.array(z.string().min(1)).default([]),
+    year: z.number().int().min(1900).max(2100).nullable(),
+    venue: z.string().min(1).nullable(),
+    abstract: z.string().min(1).nullable(),
     relevance: relevanceSchema,
     sourceType: sourceTypeSchema,
     doi: z.string().nullable(),
-    url: z
-      .string()
-      .regex(/^https?:\/\//, 'url 必须使用 http(s) 协议')
-      .nullable(),
-    relatedQuestionIds: z
-      .array(questionIdSchema)
-      .min(1, '文献必须关联至少一个研究问题'),
+    url: httpUrlSchema.nullable(),
+    openAccessPdf: httpUrlSchema.nullable().optional(),
+    citationCount: z.number().int().nonnegative().nullable().optional(),
+    referenceCount: z.number().int().nonnegative().nullable().optional(),
+    relatedQuestionIds: z.array(questionIdSchema).default([]),
   })
   .superRefine((clue, ctx) => {
-    if (clue.sourceType === 'simulated' && (clue.doi !== null || clue.url !== null)) {
+    if (
+      clue.sourceType === 'simulated' &&
+      (clue.doi !== null ||
+        clue.url !== null ||
+        (clue.openAccessPdf !== undefined && clue.openAccessPdf !== null))
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['sourceType'],
-        message: `模拟文献「${clue.id}」不得附带 DOI 或外部链接`,
+        message: `模拟文献「${clue.id}」不得附带 DOI、外部链接或 PDF`,
       })
     }
     if (clue.doi !== null && !clue.doi.startsWith('10.')) {
@@ -140,5 +171,9 @@ export type ResearchQuestion = z.infer<typeof researchQuestionSchema>
 export type SearchKeywordGroup = z.infer<typeof searchKeywordGroupSchema>
 export type ResearchPlan = z.infer<typeof researchPlanSchema>
 export type LiteratureClue = z.infer<typeof literatureClueSchema>
+export type LiteratureRetrieval = z.infer<typeof literatureRetrievalSchema>
+export type LiteratureRetrievalStatus = z.infer<
+  typeof literatureRetrievalStatusSchema
+>
 export type ReviewerComment = z.infer<typeof reviewerCommentSchema>
 export type RetrievalPlan = z.infer<typeof retrievalPlanSchema>
